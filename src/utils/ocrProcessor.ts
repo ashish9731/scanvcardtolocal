@@ -42,10 +42,21 @@ const parseCardData = (text: string): Omit<CardData, 'id'> => {
   const phoneMatches = text.match(phoneRegex);
   const phones: string[] = phoneMatches ? Array.from(phoneMatches) : [];
   
-  // Website regex
-  const websiteRegex = /(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_+.~#?&//=]*)/gi;
-  const websiteMatches = text.match(websiteRegex);
-  const websites: string[] = websiteMatches ? Array.from(websiteMatches) : [];
+  // Extract company name and website from email domain
+  let companyFromEmail = '';
+  let websiteFromEmail = '';
+  
+  if (emails.length > 0) {
+    const emailParts = emails[0].split('@');
+    if (emailParts.length === 2) {
+      const domain = emailParts[1];
+      // Remove TLD extensions to get company name
+      const domainWithoutTLD = domain.replace(/\.(com|co\.in|net|org|io|edu|gov|biz|info|me|tv|us|uk|ca|au|de|fr|jp|cn|in)$/i, '');
+      companyFromEmail = domainWithoutTLD.charAt(0).toUpperCase() + domainWithoutTLD.slice(1);
+      // Generate website with www prefix
+      websiteFromEmail = `www.${domain}`;
+    }
+  }
   
   // Common designation keywords
   const designationKeywords: string[] = [
@@ -76,14 +87,22 @@ const parseCardData = (text: string): Omit<CardData, 'id'> => {
     name = lines[0].trim();
   }
   
-  // Company name is often second line or line with certain keywords
-  if (lines.length > 1) {
+  // Company name: prioritize email domain, fallback to parsed text
+  company = companyFromEmail;
+  
+  // If no company from email, try finding from text (but avoid phone numbers and designations)
+  if (!company && lines.length > 1) {
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
+      const hasNumbers = /\d/.test(line);
+      const isPhone = phones.some((p: string) => line.includes(p));
+      const isDesignation = designationKeywords.some((kw: string) => line.toLowerCase().includes(kw.toLowerCase()));
+      
       if (line && 
           !emails.includes(line) && 
-          !phones.some((p: string) => line.includes(p)) &&
-          line !== designation &&
+          !isPhone &&
+          !isDesignation &&
+          !hasNumbers &&
           line.length > 2) {
         company = line;
         break;
@@ -107,7 +126,7 @@ const parseCardData = (text: string): Omit<CardData, 'id'> => {
     designation: designation || '',
     email: emails[0] || '',
     phone: phones[0] || '',
-    website: websites.filter((w: string) => !w.includes('@'))[0] || '',
+    website: websiteFromEmail || '',
     address: address || '',
   };
 };
