@@ -50,8 +50,8 @@ const parseCardData = (text: string): Omit<CardData, 'id'> => {
     const emailParts = emails[0].split('@');
     if (emailParts.length === 2) {
       const domain = emailParts[1];
-      // Remove TLD extensions to get company name
-      const domainWithoutTLD = domain.replace(/\.(com|co\.in|net|org|io|edu|gov|biz|info|me|tv|us|uk|ca|au|de|fr|jp|cn|in)$/i, '');
+      // Remove TLD extensions to get company name (expanded list)
+      const domainWithoutTLD = domain.replace(/\.(com|co\.in|co\.uk|net|org|io|edu|gov|biz|info|me|tv|us|uk|ca|au|de|fr|jp|cn|in|app|dev|tech|online|store|shop|site|xyz|club|pro|asia|eu)$/i, '');
       companyFromEmail = domainWithoutTLD.charAt(0).toUpperCase() + domainWithoutTLD.slice(1);
       // Generate website with www prefix
       websiteFromEmail = `www.${domain}`;
@@ -82,15 +82,37 @@ const parseCardData = (text: string): Omit<CardData, 'id'> => {
     if (designation) break;
   }
   
-  // Heuristic: First non-empty line is often the name
-  if (lines.length > 0) {
-    name = lines[0].trim();
+  // Find company name - prioritize logo area (first few lines) or email domain
+  // Logo company names are usually in the first 3-4 lines, often capitalized or unique
+  let companyFromText = '';
+  
+  for (let i = 0; i < Math.min(5, lines.length); i++) {
+    const line = lines[i].trim();
+    const hasNumbers = /\d/.test(line);
+    const isPhone = phones.some((p: string) => line.includes(p));
+    const isEmail = emails.some((e: string) => line.includes(e));
+    const isDesignation = designationKeywords.some((kw: string) => line.toLowerCase().includes(kw.toLowerCase()));
+    const hasMultipleWords = line.split(' ').length >= 2;
+    const isCapitalized = /^[A-Z]/.test(line);
+    
+    // Company name is likely: capitalized, 2+ words, no numbers, not email/phone/designation
+    if (line && 
+        !isEmail && 
+        !isPhone &&
+        !isDesignation &&
+        !hasNumbers &&
+        hasMultipleWords &&
+        isCapitalized &&
+        line.length > 3) {
+      companyFromText = line;
+      break;
+    }
   }
   
-  // Company name: prioritize email domain, fallback to parsed text
-  company = companyFromEmail;
+  // Prioritize: text from logo area > email domain
+  company = companyFromText || companyFromEmail;
   
-  // If no company from email, try finding from text (but avoid phone numbers and designations)
+  // If still no company, fallback to safer text parsing
   if (!company && lines.length > 1) {
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -105,6 +127,17 @@ const parseCardData = (text: string): Omit<CardData, 'id'> => {
           !hasNumbers &&
           line.length > 2) {
         company = line;
+        break;
+      }
+    }
+  }
+  
+  // Heuristic: First non-empty line that's not the company is often the name
+  if (lines.length > 0) {
+    for (let i = 0; i < Math.min(3, lines.length); i++) {
+      const line = lines[i].trim();
+      if (line && line !== company && !designationKeywords.some(kw => line.toLowerCase().includes(kw.toLowerCase()))) {
+        name = line;
         break;
       }
     }

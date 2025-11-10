@@ -76,7 +76,12 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
           />
           
           <Button
-            onClick={() => document.getElementById("camera-capture")?.click()}
+            onClick={() => {
+              const cameraInput = document.getElementById("camera-capture") as HTMLInputElement;
+              if (cameraInput) {
+                cameraInput.click();
+              }
+            }}
             variant="outline"
             className="flex-1 border-primary text-primary hover:bg-primary/10 transition-smooth shadow-soft"
             size="lg"
