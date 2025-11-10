@@ -1,5 +1,38 @@
 import { createWorker } from 'tesseract.js';
 
+// Helper function to resize image for better OCR performance
+const resizeImageForOCR = (imageData: string): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      // Create canvas for resizing
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        resolve(imageData); // Return original if context not available
+        return;
+      }
+      
+      // Calculate new dimensions (max 1280px width for performance)
+      const maxWidth = 1280;
+      const scale = Math.min(1, maxWidth / img.width);
+      const newWidth = Math.floor(img.width * scale);
+      const newHeight = Math.floor(img.height * scale);
+      
+      canvas.width = newWidth;
+      canvas.height = newHeight;
+      
+      // Draw resized image
+      ctx.drawImage(img, 0, 0, newWidth, newHeight);
+      
+      // Return resized image data
+      resolve(canvas.toDataURL('image/jpeg', 0.8));
+    };
+    img.src = imageData;
+  });
+};
+
 export interface CardData {
   id: string;
   name: string;
@@ -9,26 +42,28 @@ export interface CardData {
   phone: string;
   website: string;
   address: string;
+  imageData: string; // Base64 encoded image data
+  linkedinUrl?: string; // Optional LinkedIn profile URL
 }
 
 export const processImage = async (imageData: string): Promise<CardData> => {
   const worker = await createWorker('eng');
   
   try {
-    const { data: { text } } = await worker.recognize(imageData);
+    // Configure worker for better performance with business cards
+    await worker.setParameters({
+      tessedit_pageseg_mode: '6' as unknown as Tesseract.PSM, // Assume a single uniform block of text (PSM.SINGLE_BLOCK)
+      tessedit_ocr_engine_mode: '1' as unknown as Tesseract.OEM, // Use LSTM OCR Engine only (OEM.LSTM_ONLY)
+      tessedit_do_invert: '0', // Skip inversion for better performance
+    });
     
-    // Debug: Log raw OCR text
-    console.log('=== RAW OCR TEXT ===');
-    console.log(text);
-    console.log('===================');
+    // Resize image for better performance if it's too large
+    const resizedImageData = await resizeImageForOCR(imageData);
+    
+    const { data: { text } } = await worker.recognize(resizedImageData);
     
     // Parse extracted text
-    const parsedData = parseCardData(text);
-    
-    // Debug: Log parsed data
-    console.log('=== PARSED DATA ===');
-    console.log(parsedData);
-    console.log('===================');
+    const parsedData = parseCardData(text, resizedImageData);
     
     return {
       id: Date.now().toString(),
@@ -39,7 +74,7 @@ export const processImage = async (imageData: string): Promise<CardData> => {
   }
 };
 
-const parseCardData = (text: string): Omit<CardData, 'id'> => {
+export const parseCardData = (text: string, imageData: string = ''): Omit<CardData, 'id'> => {
   // Clean and normalize text
   const normalizedText = text
     .replace(/\s+/g, ' ') // normalize whitespace
@@ -61,23 +96,42 @@ const parseCardData = (text: string): Omit<CardData, 'id'> => {
   // Website regex - find www. patterns
   const websiteRegex = /(www\.[\w-]+\.[\w.-]+)/gi;
   const websiteMatches = normalizedText.match(websiteRegex);
-  let websiteFromText = websiteMatches ? websiteMatches[0].toLowerCase() : '';
+  const websiteFromText = websiteMatches ? websiteMatches[0].toLowerCase() : '';
+  
+  // Extract company name from website domain
+  const companyFromWebsite = (() => {
+    if (websiteFromText) {
+      try {
+        // Extract domain name from website (e.g., www.abc.com -> abc)
+        const domainMatch = websiteFromText.match(/www\.([\w-]+)\./i);
+        if (domainMatch && domainMatch[1]) {
+          return domainMatch[1].charAt(0).toUpperCase() + domainMatch[1].slice(1);
+        }
+      } catch (e) {
+        console.warn('Error extracting company name from website:', e);
+      }
+    }
+    return '';
+  })();
   
   // Extract company name and website from email domain
-  let companyFromEmail = '';
-  let websiteFromEmail = '';
-  
-  if (emails.length > 0) {
-    const emailParts = emails[0].split('@');
-    if (emailParts.length === 2) {
-      const domain = emailParts[1];
-      // Remove TLD extensions to get company name (expanded list)
-      const domainWithoutTLD = domain.replace(/\.(com|co\.in|co\.uk|net|org|io|edu|gov|biz|info|me|tv|us|uk|ca|au|de|fr|jp|cn|in|app|dev|tech|online|store|shop|site|xyz|club|pro|asia|eu)$/i, '');
-      companyFromEmail = domainWithoutTLD.charAt(0).toUpperCase() + domainWithoutTLD.slice(1);
-      // Generate website with www prefix if not found in text
-      websiteFromEmail = websiteFromText || `www.${domain}`;
+  const { companyFromEmail, websiteFromEmail } = (() => {
+    if (emails.length > 0) {
+      const emailParts = emails[0].split('@');
+      if (emailParts.length === 2) {
+        const domain = emailParts[1];
+        // Extract company name from email domain (part after @ and before .com)
+        const domainParts = domain.split('.');
+        const companyFromEmail = domainParts.length >= 2 
+          ? domainParts[0].charAt(0).toUpperCase() + domainParts[0].slice(1)
+          : '';
+        // Generate website with www prefix if not found in text
+        const websiteFromEmail = websiteFromText || `www.${domain}`;
+        return { companyFromEmail, websiteFromEmail };
+      }
     }
-  }
+    return { companyFromEmail: '', websiteFromEmail: '' };
+  })();
   
   // Common designation keywords
   const designationKeywords: string[] = [
@@ -128,34 +182,78 @@ const parseCardData = (text: string): Omit<CardData, 'id'> => {
   }
   
   // Find company name - prioritize logo area (first few lines) or email domain
+  // But if we have a clear website domain, prioritize that over logo text unless it's clearly a company name
   let companyFromText = '';
   
-  for (let i = 0; i < Math.min(6, lines.length); i++) {
-    const line = lines[i].trim();
+  // Enhanced company name detection with better logic for logos and company names
+  // Look at the first few lines which often contain logos/company names
+  const logoAreaLines = lines.slice(0, Math.min(10, lines.length));
+  
+  // Common company suffixes that help identify company names
+  const companySuffixes = ['Inc', 'LLC', 'Ltd', 'Corp', 'Corporation', 'Company', 'Co', 'Group', 'Associates', 'Partners', 'Enterprises', 'Solutions', 'Technologies', 'Tech', 'Industries', 'Holdings', 'Ventures', 'Capital'];
+  
+  for (let i = 0; i < logoAreaLines.length; i++) {
+    const line = logoAreaLines[i].trim();
     const words = line.split(' ');
-    const isAllCaps = line === line.toUpperCase();
+    const isAllCaps = line === line.toUpperCase() && line.length > 1;
     const hasNumbers = /\d/.test(line);
     const isPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
     const isEmail = emails.some(e => line.toLowerCase().includes(e));
     const isDesignation = designationKeywords.some(kw => line.toLowerCase().includes(kw.toLowerCase()));
     const isName = line === name;
+    const hasCompanySuffix = companySuffixes.some(suffix => line.toLowerCase().includes(suffix.toLowerCase()));
     
-    // Company name is likely: in first lines, all caps or multiple words, not name/phone/email/designation
+    // Enhanced company detection logic:
+    // - All caps text in logo area (often company names/logos)
+    // - Multiple words (2-6) that don't contain numbers
+    // - Contains company suffixes
+    // - Not identified as name, phone, email, or designation
     if (line && 
         !isName &&
         !isEmail && 
         !isPhone &&
         !isDesignation &&
-        line.length > 2 &&
-        (isAllCaps || words.length >= 2) &&
+        line.length > 1 &&
+        (isAllCaps || (words.length >= 2 && words.length <= 6) || hasCompanySuffix) &&
         !hasNumbers) {
-      companyFromText = line;
-      break;
+      // Additional check: if it's all caps and short, it's likely a company/logo
+      if (isAllCaps && line.length <= 30) {
+        companyFromText = line;
+        break;
+      }
+      // If it contains company suffixes, it's likely a company
+      else if (hasCompanySuffix) {
+        companyFromText = line;
+        break;
+      }
+      // If it's multiple words and not too long, it's likely a company
+      else if (words.length >= 2 && line.length <= 50) {
+        companyFromText = line;
+        break;
+      }
     }
   }
   
-  // Prioritize: text from logo area > email domain
-  company = companyFromText || companyFromEmail;
+  // If we still don't have a company name, try to find capitalized multi-word phrases
+  if (!companyFromText) {
+    for (let i = 0; i < Math.min(12, lines.length); i++) {
+      const line = lines[i].trim();
+      const words = line.split(' ');
+      
+      // Look for multi-word capitalized phrases that might be company names
+      if (words.length >= 2 && words.length <= 6 && /^[A-Z][a-z]/.test(words[0]) && !/\d/.test(line)) {
+        const isDesignation = designationKeywords.some(kw => line.toLowerCase().includes(kw.toLowerCase()));
+        if (!isDesignation) {
+          companyFromText = line;
+          break;
+        }
+      }
+    }
+  }
+  
+  // Prioritize: email domain > website domain > text from logo area
+  // Email domain should be the primary source for company name
+  company = companyFromEmail || companyFromWebsite || companyFromText;
   
   // Address: longer lines at the end, or lines with keywords
   const addressKeywords: string[] = ['street', 'road', 'avenue', 'ave', 'blvd', 'suite', 'floor', 'building'];
@@ -175,5 +273,6 @@ const parseCardData = (text: string): Omit<CardData, 'id'> => {
     phone: phones[0] || '',
     website: websiteFromEmail || '',
     address: address || '',
+    imageData: imageData, // Base64 encoded image data
   };
 };

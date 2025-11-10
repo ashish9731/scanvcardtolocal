@@ -1,18 +1,12 @@
-# Welcome to your Lovable project
+# Business Card Scanner
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/295ab710-5d62-41de-b041-b3cd55ede41e
+This is a business card scanner application that uses OCR technology to extract contact information from business cards.
 
 ## How can I edit this code?
 
 There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/295ab710-5d62-41de-b041-b3cd55ede41e) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
 
 **Use your preferred IDE**
 
@@ -62,7 +56,7 @@ This project is built with:
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/295ab710-5d62-41de-b041-b3cd55ede41e) and click on Share -> Publish.
+You can deploy this application using any static site hosting service like Vercel, Netlify, or GitHub Pages.
 
 ## Can I connect a custom domain to my Lovable project?
 
@@ -70,4 +64,4 @@ Yes, you can!
 
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+For setting up a custom domain, refer to your hosting provider's documentation.

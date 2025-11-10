@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Camera, Upload, X } from "lucide-react";
@@ -10,28 +10,57 @@ interface ImageCaptureProps {
 
 export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
   const [preview, setPreview] = useState<string | null>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const { toast } = useToast();
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith("image/")) {
-        toast({
-          title: "Invalid file type",
-          description: "Please select an image file",
-          variant: "destructive",
-        });
-        return;
+  // Cleanup camera stream when component unmounts
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
       }
+    };
+  }, [cameraStream]);
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const imageData = event.target?.result as string;
-        setPreview(imageData);
-        onImageCapture(imageData);
-      };
-      reader.readAsDataURL(file);
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      // Process all selected files
+      Array.from(files).forEach((file, index) => {
+        if (!file.type.startsWith("image/")) {
+          toast({
+            title: "Invalid file type",
+            description: "Please select an image file",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Check file size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          toast({
+            title: "File too large",
+            description: "Please select an image smaller than 10MB",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const imageData = event.target?.result as string;
+          setPreview(imageData);
+          // Add a small delay between processing multiple files
+          setTimeout(() => {
+            onImageCapture(imageData);
+          }, index * 100);
+        };
+        reader.readAsDataURL(file);
+      });
     }
   };
 
@@ -40,14 +69,135 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = "";
+    }
+    // Stop camera stream if active
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setShowCamera(false);
+  };
+
+  const startCamera = async () => {
+    try {
+      // Check if MediaDevices API is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        // Fallback to file input method
+        fallbackToInputMethod();
+        return;
+      }
+
+      // Stop any existing stream
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+
+      // Request camera access with constraints for better performance
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
+      });
+      
+      setCameraStream(stream);
+      setShowCamera(true);
+      
+      // Attach stream to video element
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (error) {
+      console.warn('Camera access failed, falling back to file input:', error);
+      // Try user-facing camera as fallback
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          } 
+        });
+        
+        setCameraStream(stream);
+        setShowCamera(true);
+        
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (fallbackError) {
+        // Final fallback to file input method
+        fallbackToInputMethod();
+      }
+    }
+  };
+
+  const fallbackToInputMethod = () => {
+    if (cameraInputRef.current) {
+      // Reset the value to ensure the onChange event fires
+      cameraInputRef.current.value = '';
+      
+      // Try environment camera first (rear camera)
+      const cameraInput = cameraInputRef.current;
+      cameraInput.setAttribute("capture", "environment");
+      
+      try {
+        cameraInput.click();
+      } catch (error) {
+        // Fallback: try user-facing camera
+        try {
+          cameraInput.setAttribute("capture", "user");
+          cameraInput.click();
+        } catch (fallbackError) {
+          // Final fallback: open file dialog without capture attribute
+          try {
+            cameraInput.removeAttribute("capture");
+            cameraInput.click();
+          } catch (finalError) {
+            toast({
+              title: "Camera Error",
+              description: "Failed to access camera. Please check permissions and try again.",
+              variant: "destructive",
+            });
+          }
+        }
+      }
+    }
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = canvas.toDataURL('image/jpeg');
+        setPreview(imageData);
+        onImageCapture(imageData);
+        
+        // Stop camera stream
+        if (cameraStream) {
+          cameraStream.getTracks().forEach(track => track.stop());
+          setCameraStream(null);
+        }
+        setShowCamera(false);
+      }
+    }
   };
 
   return (
-    <Card className="p-6 shadow-medium bg-gradient-card">
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold text-foreground">Capture Business Card</h2>
+    <Card className="p-2 shadow-medium bg-gradient-card">
+      <div className="space-y-1.5">
+        <h2 className="text-sm font-semibold text-foreground">Capture Business Card</h2>
         
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col gap-1">
           <input
             ref={fileInputRef}
             type="file"
@@ -55,43 +205,68 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
             onChange={handleFileSelect}
             className="hidden"
             id="file-upload"
+            multiple
           />
           
           <Button
             onClick={() => fileInputRef.current?.click()}
-            className="flex-1 bg-primary hover:bg-primary-hover text-primary-foreground transition-smooth shadow-soft"
-            size="lg"
+            className="w-full bg-primary hover:bg-primary-hover text-primary-foreground transition-smooth shadow-soft text-xs py-2"
+            size="sm"
           >
-            <Upload className="mr-2 h-5 w-5" />
+            <Upload className="mr-1 h-3 w-3" />
             Upload Image
           </Button>
 
           <input
+            ref={cameraInputRef}
             type="file"
             accept="image/*"
             capture="environment"
             onChange={handleFileSelect}
             className="hidden"
             id="camera-capture"
+            multiple
           />
           
           <Button
-            onClick={() => {
-              const cameraInput = document.getElementById("camera-capture") as HTMLInputElement;
-              if (cameraInput) {
-                cameraInput.click();
-              }
-            }}
+            onClick={startCamera}
             variant="outline"
-            className="flex-1 border-primary text-primary hover:bg-primary/10 transition-smooth shadow-soft"
-            size="lg"
+            className="w-full border-primary text-primary hover:bg-primary/10 transition-smooth shadow-soft text-xs py-2"
+            size="sm"
           >
-            <Camera className="mr-2 h-5 w-5" />
+            <Camera className="mr-1 h-3 w-3" />
             Use Camera
           </Button>
         </div>
 
-        {preview && (
+        {showCamera && (
+          <div className="relative mt-4 rounded-lg overflow-hidden shadow-medium">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              className="w-full h-auto max-h-96 object-contain bg-muted"
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Button
+                onClick={capturePhoto}
+                className="bg-primary text-primary-foreground shadow-lg"
+              >
+                Capture Photo
+              </Button>
+            </div>
+            <Button
+              onClick={clearImage}
+              size="icon"
+              variant="destructive"
+              className="absolute top-2 right-2 shadow-medium"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        
+        {preview && !showCamera && (
           <div className="relative mt-4 rounded-lg overflow-hidden shadow-medium">
             <img
               src={preview}
