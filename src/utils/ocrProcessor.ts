@@ -17,8 +17,18 @@ export const processImage = async (imageData: string): Promise<CardData> => {
   try {
     const { data: { text } } = await worker.recognize(imageData);
     
+    // Debug: Log raw OCR text
+    console.log('=== RAW OCR TEXT ===');
+    console.log(text);
+    console.log('===================');
+    
     // Parse extracted text
     const parsedData = parseCardData(text);
+    
+    // Debug: Log parsed data
+    console.log('=== PARSED DATA ===');
+    console.log(parsedData);
+    console.log('===================');
     
     return {
       id: Date.now().toString(),
@@ -30,17 +40,28 @@ export const processImage = async (imageData: string): Promise<CardData> => {
 };
 
 const parseCardData = (text: string): Omit<CardData, 'id'> => {
+  // Clean and normalize text
+  const normalizedText = text
+    .replace(/\s+/g, ' ') // normalize whitespace
+    .replace(/['']/g, "'") // normalize quotes
+    .trim();
+  
   const lines = text.split('\n').filter(line => line.trim());
   
-  // Email regex
+  // Enhanced email regex - case insensitive
   const emailRegex = /[\w.+-]+@[\w-]+\.[\w.-]+/gi;
-  const emailMatches = text.match(emailRegex);
-  const emails: string[] = emailMatches ? Array.from(emailMatches) : [];
+  const emailMatches = normalizedText.match(emailRegex);
+  const emails: string[] = emailMatches ? Array.from(emailMatches).map(e => e.toLowerCase()) : [];
   
-  // Phone regex (various formats)
-  const phoneRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\+?\d{10,}/g;
-  const phoneMatches = text.match(phoneRegex);
-  const phones: string[] = phoneMatches ? Array.from(phoneMatches) : [];
+  // Enhanced phone regex - supports Indian format
+  const phoneRegex = /(\+?\d{1,4}[\s-]?)?\(?\d{2,5}\)?[\s-]?\d{3,5}[\s-]?\d{4,5}/g;
+  const phoneMatches = normalizedText.match(phoneRegex);
+  const phones: string[] = phoneMatches ? Array.from(new Set(phoneMatches.map(p => p.trim()))) : [];
+  
+  // Website regex - find www. patterns
+  const websiteRegex = /(www\.[\w-]+\.[\w.-]+)/gi;
+  const websiteMatches = normalizedText.match(websiteRegex);
+  let websiteFromText = websiteMatches ? websiteMatches[0].toLowerCase() : '';
   
   // Extract company name and website from email domain
   let companyFromEmail = '';
@@ -53,8 +74,8 @@ const parseCardData = (text: string): Omit<CardData, 'id'> => {
       // Remove TLD extensions to get company name (expanded list)
       const domainWithoutTLD = domain.replace(/\.(com|co\.in|co\.uk|net|org|io|edu|gov|biz|info|me|tv|us|uk|ca|au|de|fr|jp|cn|in|app|dev|tech|online|store|shop|site|xyz|club|pro|asia|eu)$/i, '');
       companyFromEmail = domainWithoutTLD.charAt(0).toUpperCase() + domainWithoutTLD.slice(1);
-      // Generate website with www prefix
-      websiteFromEmail = `www.${domain}`;
+      // Generate website with www prefix if not found in text
+      websiteFromEmail = websiteFromText || `www.${domain}`;
     }
   }
   
@@ -82,28 +103,52 @@ const parseCardData = (text: string): Omit<CardData, 'id'> => {
     if (designation) break;
   }
   
-  // Find company name - prioritize logo area (first few lines) or email domain
-  // Logo company names are usually in the first 3-4 lines, often capitalized or unique
-  let companyFromText = '';
-  
+  // Enhanced name detection - look for capitalized names (2-4 words, no designation keywords)
   for (let i = 0; i < Math.min(5, lines.length); i++) {
     const line = lines[i].trim();
+    const words = line.split(' ');
+    const isAllCaps = line === line.toUpperCase() && line.length > 3;
+    const hasDesignation = designationKeywords.some(kw => line.toLowerCase().includes(kw.toLowerCase()));
     const hasNumbers = /\d/.test(line);
-    const isPhone = phones.some((p: string) => line.includes(p));
-    const isEmail = emails.some((e: string) => line.includes(e));
-    const isDesignation = designationKeywords.some((kw: string) => line.toLowerCase().includes(kw.toLowerCase()));
-    const hasMultipleWords = line.split(' ').length >= 2;
-    const isCapitalized = /^[A-Z]/.test(line);
+    const hasEmail = emails.some(e => line.toLowerCase().includes(e));
+    const hasPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
     
-    // Company name is likely: capitalized, 2+ words, no numbers, not email/phone/designation
+    // Name is likely: all caps or capitalized, 2-4 words, no designation/numbers/email/phone
     if (line && 
+        words.length >= 2 && 
+        words.length <= 4 &&
+        (isAllCaps || /^[A-Z][a-z]/.test(line)) &&
+        !hasDesignation &&
+        !hasNumbers &&
+        !hasEmail &&
+        !hasPhone) {
+      name = line;
+      break;
+    }
+  }
+  
+  // Find company name - prioritize logo area (first few lines) or email domain
+  let companyFromText = '';
+  
+  for (let i = 0; i < Math.min(6, lines.length); i++) {
+    const line = lines[i].trim();
+    const words = line.split(' ');
+    const isAllCaps = line === line.toUpperCase();
+    const hasNumbers = /\d/.test(line);
+    const isPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
+    const isEmail = emails.some(e => line.toLowerCase().includes(e));
+    const isDesignation = designationKeywords.some(kw => line.toLowerCase().includes(kw.toLowerCase()));
+    const isName = line === name;
+    
+    // Company name is likely: in first lines, all caps or multiple words, not name/phone/email/designation
+    if (line && 
+        !isName &&
         !isEmail && 
         !isPhone &&
         !isDesignation &&
-        !hasNumbers &&
-        hasMultipleWords &&
-        isCapitalized &&
-        line.length > 3) {
+        line.length > 2 &&
+        (isAllCaps || words.length >= 2) &&
+        !hasNumbers) {
       companyFromText = line;
       break;
     }
@@ -111,37 +156,6 @@ const parseCardData = (text: string): Omit<CardData, 'id'> => {
   
   // Prioritize: text from logo area > email domain
   company = companyFromText || companyFromEmail;
-  
-  // If still no company, fallback to safer text parsing
-  if (!company && lines.length > 1) {
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      const hasNumbers = /\d/.test(line);
-      const isPhone = phones.some((p: string) => line.includes(p));
-      const isDesignation = designationKeywords.some((kw: string) => line.toLowerCase().includes(kw.toLowerCase()));
-      
-      if (line && 
-          !emails.includes(line) && 
-          !isPhone &&
-          !isDesignation &&
-          !hasNumbers &&
-          line.length > 2) {
-        company = line;
-        break;
-      }
-    }
-  }
-  
-  // Heuristic: First non-empty line that's not the company is often the name
-  if (lines.length > 0) {
-    for (let i = 0; i < Math.min(3, lines.length); i++) {
-      const line = lines[i].trim();
-      if (line && line !== company && !designationKeywords.some(kw => line.toLowerCase().includes(kw.toLowerCase()))) {
-        name = line;
-        break;
-      }
-    }
-  }
   
   // Address: longer lines at the end, or lines with keywords
   const addressKeywords: string[] = ['street', 'road', 'avenue', 'ave', 'blvd', 'suite', 'floor', 'building'];
