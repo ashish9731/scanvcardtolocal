@@ -158,7 +158,6 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
                 description: "Camera loaded but playback failed. You can still capture photos.",
               });
             });
-            
           }
         };
         
@@ -184,167 +183,6 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
   
   const startManualCapture = () => {
     startCamera();
-  };
-  
-  // Function to detect card boundaries using improved edge detection
-  const detectCardBoundaries = (imageData: ImageData) => {
-    const width = imageData.width;
-    const height = imageData.height;
-    const data = imageData.data;
-    
-    // Improved edge detection algorithm for business card detection
-    
-    // Find the brightest and darkest regions to detect card edges
-    let minX = width, maxX = 0, minY = height, maxY = 0;
-    
-    // Sample pixels to find edges (every 3rd pixel for better accuracy)
-    for (let y = 0; y < height; y += 3) {
-      for (let x = 0; x < width; x += 3) {
-        const idx = (y * width + x) * 4;
-        const r = data[idx];
-        const g = data[idx + 1];
-        const b = data[idx + 2];
-        
-        // Calculate brightness
-        const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
-        
-        // If this pixel is significantly different from average brightness,
-        // it might be an edge
-        if (brightness < 40 || brightness > 220) {
-          minX = Math.min(minX, x);
-          maxX = Math.max(maxX, x);
-          minY = Math.min(minY, y);
-          maxY = Math.max(maxY, y);
-        }
-      }
-    }
-    
-    // Add some padding to the detected boundaries
-    const padding = 15;
-    const cardX = Math.max(0, minX - padding);
-    const cardY = Math.max(0, minY - padding);
-    const cardWidth = Math.min(width - cardX, maxX - minX + padding * 2);
-    const cardHeight = Math.min(height - cardY, maxY - minY + padding * 2);
-    
-    // Ensure minimum size and reasonable proportions for a business card
-    if (cardWidth < 100 || cardHeight < 50 || cardWidth > width * 0.95 || cardHeight > height * 0.95) {
-      // If detection failed, use default center positioning with more conservative sizing
-      const defaultWidth = width * 0.7;
-      const defaultHeight = height * 0.4;
-      return {
-        x: (width - defaultWidth) / 2,
-        y: (height - defaultHeight) / 2,
-        width: defaultWidth,
-        height: defaultHeight
-      };
-    }
-    
-    return {
-      x: cardX,
-      y: cardY,
-      width: cardWidth,
-      height: cardHeight
-    };
-  };
-  
-  // Fallback edge detection with improved accuracy
-  const detectCardBoundariesFallback = (imageData: ImageData) => {
-    const width = imageData.width;
-    const height = imageData.height;
-    const data = imageData.data;
-    
-    // Improved edge detection algorithm
-    
-    // Find the brightest and darkest regions to detect card edges
-    let minX = width, maxX = 0, minY = height, maxY = 0;
-    
-    // Sample pixels to find edges (every 3rd pixel for better accuracy)
-    for (let y = 0; y < height; y += 3) {
-      for (let x = 0; x < width; x += 3) {
-        const idx = (y * width + x) * 4;
-        const r = data[idx];
-        const g = data[idx + 1];
-        const b = data[idx + 2];
-        
-        // Calculate brightness
-        const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
-        
-        // If this pixel is significantly different from average brightness,
-        // it might be an edge
-        if (brightness < 40 || brightness > 220) {
-          minX = Math.min(minX, x);
-          maxX = Math.max(maxX, x);
-          minY = Math.min(minY, y);
-          maxY = Math.max(maxY, y);
-        }
-      }
-    }
-    
-    // Add some padding to the detected boundaries
-    const padding = 15;
-    const cardX = Math.max(0, minX - padding);
-    const cardY = Math.max(0, minY - padding);
-    const cardWidth = Math.min(width - cardX, maxX - minX + padding * 2);
-    const cardHeight = Math.min(height - cardY, maxY - minY + padding * 2);
-    
-    // Ensure minimum size and reasonable proportions for a business card
-    if (cardWidth < 100 || cardHeight < 50 || cardWidth > width * 0.95 || cardHeight > height * 0.95) {
-      // If detection failed, use default center positioning with more conservative sizing
-      const defaultWidth = width * 0.7;
-      const defaultHeight = height * 0.4;
-      return {
-        x: (width - defaultWidth) / 2,
-        y: (height - defaultHeight) / 2,
-        width: defaultWidth,
-        height: defaultHeight
-      };
-    }
-    
-    return {
-      x: cardX,
-      y: cardY,
-      width: cardWidth,
-      height: cardHeight
-    };
-  };
-  
-  // Function to validate if detected boundaries represent a full card
-  const isFullCardDetected = (boundaries: {x: number, y: number, width: number, height: number}, canvasWidth: number, canvasHeight: number) => {
-    // Check if the detected area is reasonably sized for a business card
-    const minWidth = canvasWidth * 0.3;
-    const minHeight = canvasHeight * 0.2;
-    const maxWidth = canvasWidth * 0.95;
-    const maxHeight = canvasHeight * 0.8;
-    
-    return boundaries.width >= minWidth && boundaries.width <= maxWidth &&
-           boundaries.height >= minHeight && boundaries.height <= maxHeight &&
-           boundaries.x >= 0 && boundaries.y >= 0 &&
-           boundaries.x + boundaries.width <= canvasWidth &&
-           boundaries.y + boundaries.height <= canvasHeight;
-  };
-  
-  // Function to adjust boundaries to ensure full card capture
-  const adjustBoundariesForFullCard = (boundaries: {x: number, y: number, width: number, height: number}, canvasWidth: number, canvasHeight: number) => {
-    // Ensure boundaries are within canvas
-    let x = Math.max(0, boundaries.x);
-    let y = Math.max(0, boundaries.y);
-    let width = Math.min(canvasWidth - x, boundaries.width);
-    let height = Math.min(canvasHeight - y, boundaries.height);
-    
-    // If the detected area is too small, expand it
-    if (width < canvasWidth * 0.4) {
-      const expansion = (canvasWidth * 0.4 - width) / 2;
-      x = Math.max(0, x - expansion);
-      width = Math.min(canvasWidth - x, width + expansion * 2);
-    }
-    
-    if (height < canvasHeight * 0.3) {
-      const expansion = (canvasHeight * 0.3 - height) / 2;
-      y = Math.max(0, y - expansion);
-      height = Math.min(canvasHeight - y, height + expansion * 2);
-    }
-    
-    return { x, y, width, height };
   };
   
   // Function to draw detected corners for visual feedback
@@ -409,9 +247,16 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
     // Select the four strongest corners
     const selectedCorners = corners.slice(0, 4);
     
-    // If we don't have enough corners, fall back to edge detection
+    // If we don't have enough corners, use default positioning
     if (selectedCorners.length < 4) {
-      return detectCardBoundariesFallback(imageData);
+      const defaultWidth = width * 0.8;
+      const defaultHeight = height * 0.5;
+      return {
+        x: (width - defaultWidth) / 2,
+        y: (height - defaultHeight) / 2,
+        width: defaultWidth,
+        height: defaultHeight
+      };
     }
     
     // Determine card boundaries from corners
@@ -429,7 +274,14 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
     
     // Ensure minimum size
     if (cardWidth < 100 || cardHeight < 50) {
-      return detectCardBoundariesFallback(imageData);
+      const defaultWidth = width * 0.8;
+      const defaultHeight = height * 0.5;
+      return {
+        x: (width - defaultWidth) / 2,
+        y: (height - defaultHeight) / 2,
+        width: defaultWidth,
+        height: defaultHeight
+      };
     }
     
     return {
@@ -612,51 +464,10 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
           // If draw fails, at least we have the black background
         }
         
-        // Auto-detect card boundaries and crop the image
-        const imageDataForDetection = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        let cardBoundaries = detectCardBoundaries(imageDataForDetection);
-        
-        // Validate and adjust boundaries to ensure full card capture
-        const isValidBoundaries = isFullCardDetected(cardBoundaries, canvas.width, canvas.height);
-        
-        if (!isValidBoundaries) {
-          // Try corner detection as fallback
-          cardBoundaries = detectCardBoundariesWithCorners(imageDataForDetection);
-          
-          // If still not valid, adjust boundaries
-          if (!isFullCardDetected(cardBoundaries, canvas.width, canvas.height)) {
-            cardBoundaries = adjustBoundariesForFullCard(cardBoundaries, canvas.width, canvas.height);
-          }
-        }
-        
-        // Create a new canvas for the cropped card image
-        const croppedCanvas = document.createElement('canvas');
-        const cropWidth = Math.min(canvas.width, Math.max(100, cardBoundaries.width));
-        const cropHeight = Math.min(canvas.height, Math.max(50, cardBoundaries.height));
-        croppedCanvas.width = cropWidth;
-        croppedCanvas.height = cropHeight;
-        
-        const croppedCtx = croppedCanvas.getContext('2d');
-        if (croppedCtx) {
-          // Draw the cropped region
-          croppedCtx.drawImage(
-            canvas,
-            Math.max(0, cardBoundaries.x), Math.max(0, cardBoundaries.y), 
-            Math.min(canvas.width - cardBoundaries.x, cropWidth), 
-            Math.min(canvas.height - cardBoundaries.y, cropHeight), // source
-            0, 0, cropWidth, cropHeight // destination
-          );
-          
-          // Convert to JPEG with good quality
-          const imageData = croppedCanvas.toDataURL('image/jpeg', 0.95); // Increased quality
-          setPreview(imageData);
-          onImageCapture(imageData);
-        } else {
-          // Fallback if cropped context fails
-          const imageData = canvas.toDataURL('image/jpeg', 0.95);
-          setPreview(imageData);
-          onImageCapture(imageData);
-        }
+        // Convert to JPEG with good quality
+        const imageData = canvas.toDataURL('image/jpeg', 0.95); // High quality for better OCR
+        setPreview(imageData);
+        onImageCapture(imageData);
         
         // Stop camera stream
         if (cameraStream) {
@@ -771,6 +582,6 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
       </div>
     </Card>
   );
-  
-
 };
+
+export default ImageCapture;
