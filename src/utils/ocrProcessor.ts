@@ -214,7 +214,26 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     }
   }
   
-  // Final fallback: if no name found, try to find any capitalized line that might be a name
+  // Final fallback: if no name found, try to extract from email address
+  if (!name && emails.length > 0) {
+    // Extract username from email (part before @)
+    const emailParts = emails[0].split('@');
+    if (emailParts.length === 2) {
+      const username = emailParts[0];
+      // Convert username to proper name format (replace dots with spaces and capitalize)
+      let extractedName = username.replace(/\./g, ' ') // Replace dots with spaces
+        .replace(/\b\w/g, char => char.toUpperCase()) // Capitalize first letter of each word
+        .trim();
+      
+      // Only use if it looks like a reasonable name (2-3 words, no numbers)
+      const words = extractedName.split(' ');
+      if (words.length >= 1 && words.length <= 3 && !/\d/.test(extractedName)) {
+        name = extractedName;
+      }
+    }
+  }
+  
+  // Last resort: try to find any capitalized line that might be a name
   if (!name) {
     for (let i = 0; i < Math.min(6, lines.length); i++) {
       const line = lines[i].trim();
@@ -311,12 +330,28 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   company = companyFromEmail || companyFromWebsite || companyFromText;
   
   // Address: longer lines at the end, or lines with keywords
-  const addressKeywords: string[] = ['street', 'road', 'avenue', 'ave', 'blvd', 'suite', 'floor', 'building'];
+  // But exclude lines that contain email addresses or phone numbers
+  const addressKeywords: string[] = ['street', 'road', 'avenue', 'ave', 'blvd', 'suite', 'floor', 'building', 'block', 'sector', 'area'];
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i].trim();
-    if (line.length > 20 || addressKeywords.some((kw: string) => line.toLowerCase().includes(kw))) {
-      address = line;
-      break;
+    
+    // Skip if line contains email or phone
+    const hasEmail = emails.some(e => line.toLowerCase().includes(e.toLowerCase()));
+    const hasPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
+    
+    if (hasEmail || hasPhone) continue;
+    
+    // Look for address-like content
+    if ((line.length > 20 && line.length < 100) || addressKeywords.some((kw: string) => line.toLowerCase().includes(kw))) {
+      // Additional validation: address should contain numbers and/or address keywords
+      const hasNumbers = /\d/.test(line);
+      const hasAddressKeyword = addressKeywords.some((kw: string) => line.toLowerCase().includes(kw));
+      
+      // Only set as address if it has numbers or address keywords
+      if (hasNumbers || hasAddressKeyword) {
+        address = line;
+        break;
+      }
     }
   }
   
