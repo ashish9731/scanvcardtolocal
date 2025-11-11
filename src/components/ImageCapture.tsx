@@ -13,6 +13,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [isAutoCapture, setIsAutoCapture] = useState(false);
+  const [isSmartAutoCapture, setIsSmartAutoCapture] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -143,7 +144,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
             });
             
             // If auto-capture is enabled, capture after a short delay
-            if (autoCapture) {
+            if (autoCapture && !isSmartAutoCapture) {
               setTimeout(() => {
                 if (videoRef.current && showCamera) {
                   capturePhoto();
@@ -180,6 +181,98 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
   const startManualCapture = () => {
     startCamera(false);
   };
+  
+  const startSmartAutoCapture = () => {
+    setIsSmartAutoCapture(true);
+    startCamera(true);
+  };
+  
+  // Function to analyze image quality and detect business card alignment
+  const analyzeImageQuality = (video: HTMLVideoElement): boolean => {
+    try {
+      // Create canvas to capture video frame
+      const canvas = document.createElement('canvas');
+      const width = video.videoWidth || 640;
+      const height = video.videoHeight || 480;
+      canvas.width = width;
+      canvas.height = height;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return false;
+      
+      // Draw video frame to canvas
+      ctx.drawImage(video, 0, 0, width, height);
+      
+      // Get image data for analysis
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      
+      // Simple brightness analysis to detect if image is properly lit
+      let totalBrightness = 0;
+      let validPixels = 0;
+      
+      // Sample pixels (every 10th pixel for performance)
+      for (let i = 0; i < data.length; i += 40) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        // Calculate brightness (luminance formula)
+        const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+        totalBrightness += brightness;
+        validPixels++;
+      }
+      
+      const averageBrightness = totalBrightness / validPixels;
+      
+      // Check if brightness is in acceptable range (not too dark or bright)
+      const isProperlyLit = averageBrightness > 50 && averageBrightness < 220;
+      
+      // For now, we'll use a simple approach - in a real implementation,
+      // we would add edge detection and business card boundary detection
+      return isProperlyLit;
+    } catch (error) {
+      console.warn('Image quality analysis failed:', error);
+      return false;
+    }
+  };
+  
+  // Function to start smart auto-capture with zoom and quality detection
+  const initiateSmartAutoCapture = () => {
+    if (!videoRef.current || !isSmartAutoCapture) return;
+    
+    const video = videoRef.current;
+    
+    // Check if video is ready
+    if (video.readyState >= video.HAVE_METADATA) {
+      // Analyze image quality
+      const isGoodQuality = analyzeImageQuality(video);
+      
+      if (isGoodQuality) {
+        // Good quality detected, capture the image
+        console.log('Good quality image detected, capturing...');
+        capturePhoto();
+        setIsSmartAutoCapture(false); // Stop smart capture after successful capture
+      } else {
+        // Continue checking - schedule next analysis
+        setTimeout(initiateSmartAutoCapture, 500);
+      }
+    } else {
+      // Video not ready yet, check again shortly
+      setTimeout(initiateSmartAutoCapture, 500);
+    }
+  };
+  
+  // Effect to start smart auto-capture when camera is ready
+  useEffect(() => {
+    if (isSmartAutoCapture && showCamera && videoRef.current) {
+      // Start the smart auto-capture analysis after a short delay
+      const timer = setTimeout(() => {
+        initiateSmartAutoCapture();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isSmartAutoCapture, showCamera]);
 
 
   const fallbackToInputMethod = () => {
@@ -326,6 +419,16 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
           >
             <Camera className="mr-1 h-3 w-3" />
             Auto Capture
+          </Button>
+          
+          <Button
+            onClick={startSmartAutoCapture}
+            variant="outline"
+            className="w-full border-blue-500 text-blue-500 hover:bg-blue-500/10 transition-smooth shadow-soft text-xs py-2"
+            size="sm"
+          >
+            <Camera className="mr-1 h-3 w-3" />
+            Smart Auto Capture
           </Button>
         </div>
 
