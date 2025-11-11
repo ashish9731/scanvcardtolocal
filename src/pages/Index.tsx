@@ -5,6 +5,9 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { processImage, type CardData } from "@/utils/ocrProcessor";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CreditCard } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 const Index = () => {
   const [cards, setCards] = useState<CardData[]>([]);
@@ -13,6 +16,8 @@ const Index = () => {
   const [processedCount, setProcessedCount] = useState<number>(0);
   const [showApp, setShowApp] = useState(false);
   const { toast } = useToast();
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
 
   const handleImageCapture = async (imageData: string) => {
     // Increment the processing queue
@@ -73,6 +78,18 @@ const Index = () => {
     });
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
 
   return (
@@ -183,6 +200,9 @@ const Index = () => {
             <h1 className="text-2xl font-bold text-foreground">Business Card Scanner</h1>
             <div className="flex items-center gap-4">
               <ThemeToggle />
+              <Button onClick={handleLogout} variant="outline" size="sm">
+                Logout
+              </Button>
               <button
                 onClick={() => setShowApp(false)}
                 className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors text-sm"
