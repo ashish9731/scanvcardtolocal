@@ -4,7 +4,7 @@ import { CardDataTable } from "@/components/CardDataTable";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { processImage, type CardData } from "@/utils/ocrProcessor";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -133,6 +133,18 @@ const AppPage = () => {
             Logout
           </Button>
         </div>
+      </div>
+      
+      <div className="mb-4">
+        <Button 
+          onClick={() => navigate('/')} 
+          variant="ghost" 
+          size="sm"
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Home
+        </Button>
       </div>
       
       <div className="mb-6">

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from './ui/label';
 import { useNavigate } from 'react-router-dom';
 import { toast } from './ui/use-toast';
+import { ArrowLeft } from 'lucide-react';
 
 const Signup = () => {
   const [email, setEmail] = useState('');
@@ -132,6 +133,17 @@ const Signup = () => {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <Card className="w-full max-w-md">
         <CardHeader>
+          <div className="mb-2">
+            <Button 
+              onClick={() => navigate('/')} 
+              variant="ghost" 
+              size="sm"
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground p-0"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Home
+            </Button>
+          </div>
           <CardTitle>Sign Up</CardTitle>
           <CardDescription>Create a new account to get started</CardDescription>
         </CardHeader>
