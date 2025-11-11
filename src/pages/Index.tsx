@@ -218,35 +218,9 @@ const Index = () => {
               </div>
             </div>
             
-            {/* Right Side - Report/Results (Moved to left with new layout) */}
+            {/* Right Side - Empty Column */}
             <div className="py-4 lg:col-span-1">
-              <div className="bg-gradient-to-br from-card to-muted rounded-2xl shadow-xl p-6 border border-border h-full">
-                <h2 className="text-2xl font-bold text-foreground mb-4">Quick Stats</h2>
-                
-                <div className="space-y-4">
-                  <div className="bg-muted/50 rounded-xl p-4 border border-border">
-                    <div className="text-3xl font-bold text-primary">{cards.length}</div>
-                    <div className="text-muted-foreground">Cards Scanned</div>
-                  </div>
-                  
-                  <div className="bg-muted/50 rounded-xl p-4 border border-border">
-                    <div className="text-3xl font-bold text-primary">{cards.filter(card => card.email).length}</div>
-                    <div className="text-muted-foreground">Emails Extracted</div>
-                  </div>
-                  
-                  <div className="bg-muted/50 rounded-xl p-4 border border-border">
-                    <div className="text-3xl font-bold text-primary">{cards.filter(card => card.phone).length}</div>
-                    <div className="text-muted-foreground">Phone Numbers</div>
-                  </div>
-                  
-                  <div className="pt-4 mt-4 border-t border-border">
-                    <h3 className="font-semibold text-foreground mb-2">Export Options</h3>
-                    <p className="text-sm text-muted-foreground">
-                      After scanning cards, use the export buttons in the report section to save your data in CSV or VCF format.
-                    </p>
-                  </div>
-                </div>
-              </div>
+              {/* Placeholder for future content or spacing */}
             </div>
           </div>
         </div>
