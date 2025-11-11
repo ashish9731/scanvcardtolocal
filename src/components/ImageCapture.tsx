@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Camera, Upload, X } from "lucide-react";
+import { Camera, Upload, X, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ImageCaptureProps {
@@ -12,10 +12,21 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
   const [preview, setPreview] = useState<string | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [showCamera, setShowCamera] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { toast } = useToast();
+
+  // Check orientation on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Cleanup camera stream when component unmounts
   useEffect(() => {
@@ -100,6 +111,16 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
   };
 
   const startCamera = async (autoCapture = false) => {
+    // Check if device is in landscape mode
+    if (window.innerWidth < window.innerHeight) {
+      toast({
+        title: "Orientation Warning",
+        description: "Please rotate your device to landscape mode for optimal card scanning.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       // Stop any existing stream
       if (cameraStream) {
@@ -498,6 +519,16 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
       <div className="space-y-1.5">
         <h2 className="text-sm font-semibold text-foreground">Capture Business Card</h2>
         
+        {/* Landscape mode warning */}
+        {!isLandscape && showCamera && (
+          <div className="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-4">
+            <div className="flex items-center">
+              <RotateCcw className="h-5 w-5 text-yellow-500 mr-2" />
+              <p className="text-yellow-700 font-medium">Please rotate your device to landscape mode for optimal card scanning.</p>
+            </div>
+          </div>
+        )}
+        
         <div className="flex flex-col gap-1">
           <input
             ref={fileInputRef}
@@ -539,7 +570,6 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
             Use Camera
           </Button>
           
-
         </div>
 
         {showCamera && (
@@ -554,6 +584,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
               <Button
                 onClick={capturePhoto}
                 className="flex-1 bg-primary text-primary-foreground shadow-lg"
+                disabled={!isLandscape}
               >
                 Capture Photo
               </Button>

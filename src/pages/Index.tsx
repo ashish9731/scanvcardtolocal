@@ -312,7 +312,6 @@ const Index = () => {
               www.keenedgetech.com
             </a>
           </p>
-          <p className="mt-2 text-sm">Built with OCR technology • Scan, Extract, Export</p>
         </div>
       </footer>
     </div>
