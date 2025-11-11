@@ -512,13 +512,61 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
           // If draw fails, at least we have the black background
         }
         
-        // For smart auto-capture, crop to detected card boundaries for better results
-        // In a real implementation, we would crop the image to the detected boundaries
+        // Auto-detect card boundaries and crop the image
+        const imageDataForDetection = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const cardBoundaries = detectCardBoundaries(imageDataForDetection);
         
-        // Convert to JPEG with good quality
-        const imageData = canvas.toDataURL('image/jpeg', 0.9); // Increased quality
-        setPreview(imageData);
-        onImageCapture(imageData);
+        // Create a new canvas for the cropped card image
+        const croppedCanvas = document.createElement('canvas');
+        const cropWidth = cardBoundaries.width;
+        const cropHeight = cardBoundaries.height;
+        croppedCanvas.width = cropWidth;
+        croppedCanvas.height = cropHeight;
+        
+        const croppedCtx = croppedCanvas.getContext('2d');
+        if (croppedCtx) {
+          // Draw the cropped region
+          croppedCtx.drawImage(
+            canvas,
+            cardBoundaries.x, cardBoundaries.y, cropWidth, cropHeight, // source
+            0, 0, cropWidth, cropHeight // destination
+          );
+          
+          // Zoom in by scaling the cropped image to fill the canvas
+          const zoomFactor = 1.5; // 1.5x zoom
+          const zoomedCanvas = document.createElement('canvas');
+          zoomedCanvas.width = cropWidth;
+          zoomedCanvas.height = cropHeight;
+          const zoomedCtx = zoomedCanvas.getContext('2d');
+          
+          if (zoomedCtx) {
+            // Draw the cropped image scaled up (zoomed)
+            const scaledWidth = cropWidth * zoomFactor;
+            const scaledHeight = cropHeight * zoomFactor;
+            const offsetX = (scaledWidth - cropWidth) / 2;
+            const offsetY = (scaledHeight - cropHeight) / 2;
+            
+            zoomedCtx.drawImage(
+              croppedCanvas,
+              -offsetX, -offsetY, scaledWidth, scaledHeight
+            );
+            
+            // Convert to JPEG with good quality
+            const imageData = zoomedCanvas.toDataURL('image/jpeg', 0.9); // Increased quality
+            setPreview(imageData);
+            onImageCapture(imageData);
+          } else {
+            // Fallback if zoomed context fails
+            const imageData = croppedCanvas.toDataURL('image/jpeg', 0.9);
+            setPreview(imageData);
+            onImageCapture(imageData);
+          }
+        } else {
+          // Fallback if cropped context fails
+          const imageData = canvas.toDataURL('image/jpeg', 0.9);
+          setPreview(imageData);
+          onImageCapture(imageData);
+        }
         
         // Stop camera stream
         if (cameraStream) {
