@@ -82,75 +82,38 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
 
   const startCamera = async () => {
     try {
-      // Stop any existing stream
       if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
         setCameraStream(null);
       }
 
-      // Request camera access with specific constraints for better compatibility
-      const constraints = {
+      const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'environment',
+          facingMode: { ideal: "environment" }, // iOS fix
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
-      };
-      
-      // Try environment camera first
-      let stream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
-      } catch (envError) {
-        // Fallback to user-facing camera
-        console.warn('Environment camera failed, trying user camera:', envError);
-        constraints.video.facingMode = 'user';
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
-      }
-      
+      });
+
       setCameraStream(stream);
       setShowCamera(true);
-      
-      // Attach stream to video element
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        
-        // Add event listeners for better control
-        videoRef.current.onloadedmetadata = () => {
-          console.log('Video metadata loaded');
-          videoRef.current?.play().catch(err => {
-            console.warn('Video play failed:', err);
-            toast({
-              title: "Camera Error",
-              description: "Failed to start camera. Please try again.",
-              variant: "destructive",
-            });
-          });
-        };
-        
-        videoRef.current.onerror = (err) => {
-          console.error('Video error:', err);
-          toast({
-            title: "Camera Error",
-            description: "Failed to access camera. Please check permissions.",
-            variant: "destructive",
-          });
-        };
+        videoRef.current.setAttribute("playsinline", ""); // iOS fix
+
+        await videoRef.current.play().catch(err => {
+          console.log("Video play failed:", err);
+        });
       }
-    } catch (error) {
-      console.error('Camera access failed:', error);
+    } catch (error: any) {
+      console.log("Camera Error:", error.name, error.message);
       toast({
-        title: "Camera Access Failed",
-        description: "Unable to access camera. Please ensure permissions are granted.",
+        title: "Camera Error",
+        description: error.message || "Unable to access camera",
         variant: "destructive",
       });
-      
-      // Fallback to file input method
-      setTimeout(() => {
-        if (cameraInputRef.current) {
-          cameraInputRef.current.click();
-        }
-      }, 100);
+      setShowCamera(false);
     }
   };
 
