@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, CreditCard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "../contexts/AuthContext";
 
 const Index = () => {
   const [cards, setCards] = useState<CardData[]>([]);
@@ -16,6 +17,7 @@ const Index = () => {
   const [showApp, setShowApp] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
 
   const handleImageCapture = async (imageData: string) => {
     // Increment the processing queue
@@ -84,6 +86,18 @@ const Index = () => {
     navigate('/signup');
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleStartCapturing = () => {
     // Redirect to the protected app page
     navigate('/app');
@@ -95,12 +109,20 @@ const Index = () => {
         // Hero Section with CTA
         <div className="max-w-4xl mx-auto px-4 py-16 md:py-24 text-center">
           <div className="absolute top-4 right-4 flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleLoginClick}>
-              Login
-            </Button>
-            <Button size="sm" onClick={handleSignupClick}>
-              Sign Up
-            </Button>
+            {user ? (
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                Logout
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" onClick={handleLoginClick}>
+                  Login
+                </Button>
+                <Button size="sm" onClick={handleSignupClick}>
+                  Sign Up
+                </Button>
+              </>
+            )}
             <ThemeToggle />
           </div>
           <div className="space-y-8">
