@@ -5,9 +5,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { processImage, type CardData } from "@/utils/ocrProcessor";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CreditCard } from "lucide-react";
-import { useAuth } from "../contexts/AuthContext";
-import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 const Index = () => {
   const [cards, setCards] = useState<CardData[]>([]);
@@ -16,7 +15,6 @@ const Index = () => {
   const [processedCount, setProcessedCount] = useState<number>(0);
   const [showApp, setShowApp] = useState(false);
   const { toast } = useToast();
-  const { signOut } = useAuth();
   const navigate = useNavigate();
 
   const handleImageCapture = async (imageData: string) => {
@@ -78,26 +76,31 @@ const Index = () => {
     });
   };
 
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      navigate('/login');
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to log out. Please try again.",
-        variant: "destructive",
-      });
-    }
+  const handleLoginClick = () => {
+    navigate('/login');
   };
 
+  const handleSignupClick = () => {
+    navigate('/signup');
+  };
+
+  const handleStartCapturing = () => {
+    // Redirect to the protected app page
+    navigate('/app');
+  };
 
   return (
     <div className="min-h-screen bg-background">
       {!showApp ? (
         // Hero Section with CTA
         <div className="max-w-4xl mx-auto px-4 py-16 md:py-24 text-center">
-          <div className="absolute top-4 right-4">
+          <div className="absolute top-4 right-4 flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleLoginClick}>
+              Login
+            </Button>
+            <Button size="sm" onClick={handleSignupClick}>
+              Sign Up
+            </Button>
             <ThemeToggle />
           </div>
           <div className="space-y-8">
@@ -113,7 +116,7 @@ const Index = () => {
             
             <div className="pt-8">
               <button
-                onClick={() => setShowApp(true)}
+                onClick={handleStartCapturing}
                 className="px-8 py-4 bg-primary text-primary-foreground font-semibold rounded-lg shadow-lg hover:bg-primary/90 transition-all transform hover:scale-105 text-lg"
               >
                 Start Capturing Cards
@@ -200,9 +203,6 @@ const Index = () => {
             <h1 className="text-2xl font-bold text-foreground">Business Card Scanner</h1>
             <div className="flex items-center gap-4">
               <ThemeToggle />
-              <Button onClick={handleLogout} variant="outline" size="sm">
-                Logout
-              </Button>
               <button
                 onClick={() => setShowApp(false)}
                 className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors text-sm"
@@ -312,6 +312,7 @@ const Index = () => {
               www.keenedgetech.com
             </a>
           </p>
+          <p className="mt-2 text-sm">Built with OCR technology • Scan, Extract, Export</p>
         </div>
       </footer>
     </div>
