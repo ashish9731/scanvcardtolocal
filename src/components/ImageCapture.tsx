@@ -149,7 +149,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
                 if (videoRef.current && showCamera) {
                   capturePhoto();
                 }
-              }, 2000); // Auto-capture after 2 seconds
+              }, 1000); // Auto-capture after 1 second for faster response
             }
           }
         };
@@ -187,56 +187,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
     startCamera(true);
   };
   
-  // Function to analyze image quality and detect business card alignment
-  const analyzeImageQuality = (video: HTMLVideoElement): boolean => {
-    try {
-      // Create canvas to capture video frame
-      const canvas = document.createElement('canvas');
-      const width = video.videoWidth || 640;
-      const height = video.videoHeight || 480;
-      canvas.width = width;
-      canvas.height = height;
-      
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return false;
-      
-      // Draw video frame to canvas
-      ctx.drawImage(video, 0, 0, width, height);
-      
-      // Get image data for analysis
-      const imageData = ctx.getImageData(0, 0, width, height);
-      const data = imageData.data;
-      
-      // Simple brightness analysis to detect if image is properly lit
-      let totalBrightness = 0;
-      let validPixels = 0;
-      
-      // Sample pixels (every 10th pixel for performance)
-      for (let i = 0; i < data.length; i += 40) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        // Calculate brightness (luminance formula)
-        const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
-        totalBrightness += brightness;
-        validPixels++;
-      }
-      
-      const averageBrightness = totalBrightness / validPixels;
-      
-      // Check if brightness is in acceptable range (not too dark or bright)
-      const isProperlyLit = averageBrightness > 50 && averageBrightness < 220;
-      
-      // For now, we'll use a simple approach - in a real implementation,
-      // we would add edge detection and business card boundary detection
-      return isProperlyLit;
-    } catch (error) {
-      console.warn('Image quality analysis failed:', error);
-      return false;
-    }
-  };
-  
-  // Function to start smart auto-capture with zoom and quality detection
+  // Simplified smart auto-capture that works immediately
   const initiateSmartAutoCapture = () => {
     if (!videoRef.current || !isSmartAutoCapture) return;
     
@@ -244,31 +195,23 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
     
     // Check if video is ready
     if (video.readyState >= video.HAVE_METADATA) {
-      // Analyze image quality
-      const isGoodQuality = analyzeImageQuality(video);
-      
-      if (isGoodQuality) {
-        // Good quality detected, capture the image
-        console.log('Good quality image detected, capturing...');
-        capturePhoto();
-        setIsSmartAutoCapture(false); // Stop smart capture after successful capture
-      } else {
-        // Continue checking - schedule next analysis
-        setTimeout(initiateSmartAutoCapture, 500);
-      }
+      // Immediately capture the image for smart auto-capture
+      console.log('Smart auto-capture triggered, capturing image...');
+      capturePhoto();
+      setIsSmartAutoCapture(false); // Stop smart capture after successful capture
     } else {
       // Video not ready yet, check again shortly
-      setTimeout(initiateSmartAutoCapture, 500);
+      setTimeout(initiateSmartAutoCapture, 100);
     }
   };
   
   // Effect to start smart auto-capture when camera is ready
   useEffect(() => {
     if (isSmartAutoCapture && showCamera && videoRef.current) {
-      // Start the smart auto-capture analysis after a short delay
+      // Start the smart auto-capture analysis immediately
       const timer = setTimeout(() => {
         initiateSmartAutoCapture();
-      }, 1000);
+      }, 500);
       
       return () => clearTimeout(timer);
     }
@@ -284,7 +227,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
       const cameraInput = cameraInputRef.current;
       cameraInput.setAttribute("capture", "environment");
       
-      // Click the input directly with a small delay to ensure DOM is ready
+      // Click the input directly with minimal delay to ensure DOM is ready
       setTimeout(() => {
         if (cameraInputRef.current) {
           try {
@@ -303,7 +246,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
             }
           }
         }
-      }, 100);
+      }, 50);
     }
   };
 
