@@ -82,78 +82,42 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
 
   const startCamera = async () => {
     try {
-      // Check if MediaDevices API is available
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        // Fallback to file input method
-        fallbackToInputMethod();
-        return;
-      }
-
       // Stop any existing stream
       if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
         setCameraStream(null);
       }
 
-      // Request camera access with constraints for better performance
+      // Request camera access with simple constraints for immediate response
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        } 
+        video: true
       });
       
       setCameraStream(stream);
       setShowCamera(true);
       
-      // Attach stream to video element
+      // Attach stream to video element immediately
       if (videoRef.current) {
-        // Wait a moment for the video element to be ready
+        videoRef.current.srcObject = stream;
+        // Play the video immediately
+        videoRef.current.play().catch(err => console.warn('Video play failed:', err));
+                
+        // Small delay to ensure video is ready
         setTimeout(() => {
           if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            // Play the video to ensure it's active
-            videoRef.current.play().catch(err => console.warn('Video play failed:', err));
+            videoRef.current.classList.add('video-ready');
           }
-        }, 100);
+        }, 500);
       }
     } catch (error) {
-      console.warn('Camera access failed, falling back to file input:', error);
-      // Try user-facing camera as fallback
-      try {
-        // Stop any existing stream first
-        if (cameraStream) {
-          cameraStream.getTracks().forEach(track => track.stop());
-          setCameraStream(null);
-        }
-        
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            facingMode: 'user',
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          } 
-        });
-        
-        setCameraStream(stream);
-        setShowCamera(true);
-        
-        if (videoRef.current) {
-          // Wait a moment for the video element to be ready
-          setTimeout(() => {
-            if (videoRef.current) {
-              videoRef.current.srcObject = stream;
-              // Play the video to ensure it's active
-              videoRef.current.play().catch(err => console.warn('Video play failed:', err));
-            }
-          }, 100);
-        }
-      } catch (fallbackError) {
-        console.warn('User-facing camera also failed:', fallbackError);
-        // Final fallback to file input method
-        fallbackToInputMethod();
-      }
+      console.warn('Camera access failed:', error);
+      toast({
+        title: "Camera Access Denied",
+        description: "Please ensure camera permissions are granted and try again.",
+        variant: "destructive",
+      });
+      // Hide camera view on error
+      setShowCamera(false);
     }
   };
 
@@ -166,43 +130,32 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
       const cameraInput = cameraInputRef.current;
       cameraInput.setAttribute("capture", "environment");
       
-      try {
-        cameraInput.click();
-      } catch (error) {
-        // Fallback: try user-facing camera
-        try {
-          cameraInput.setAttribute("capture", "user");
-          cameraInput.click();
-        } catch (fallbackError) {
-          // Final fallback: open file dialog without capture attribute
-          try {
-            cameraInput.removeAttribute("capture");
-            cameraInput.click();
-          } catch (finalError) {
-            toast({
-              title: "Camera Error",
-              description: "Failed to access camera. Please check permissions and try again.",
-              variant: "destructive",
-            });
-          }
-        }
-      }
+      // Click the input directly
+      cameraInput.click();
     }
   };
 
   const capturePhoto = () => {
-    if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+    if (videoRef.current) {
       const video = videoRef.current;
+      
+      // Check if video is actually playing and has data
+      if (video.readyState < video.HAVE_METADATA) {
+        toast({
+          title: "Camera not ready",
+          description: "Please wait for the camera to initialize and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      // Use video dimensions or default to 1280x720
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
       
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        // Draw a black background first to ensure proper capture
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
         // Draw the video frame
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
@@ -218,12 +171,6 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
         }
         setShowCamera(false);
       }
-    } else {
-      toast({
-        title: "Camera not ready",
-        description: "Please wait for the camera to initialize and try again.",
-        variant: "destructive",
-      });
     }
   };
 
