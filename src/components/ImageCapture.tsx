@@ -12,8 +12,6 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
   const [preview, setPreview] = useState<string | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [showCamera, setShowCamera] = useState(false);
-  const [isAutoCapture, setIsAutoCapture] = useState(false);
-  const [isSmartAutoCapture, setIsSmartAutoCapture] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -109,8 +107,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
         setCameraStream(null);
       }
       
-      // Set auto-capture mode
-      setIsAutoCapture(autoCapture);
+      // Auto-capture mode removed
 
       // Try environment camera first
       let stream;
@@ -162,14 +159,6 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
               });
             });
             
-            // If auto-capture is enabled, capture after a short delay
-            if (autoCapture && !isSmartAutoCapture) {
-              setTimeout(() => {
-                if (videoRef.current && showCamera) {
-                  capturePhoto();
-                }
-              }, 1000); // Auto-capture after 1 second for faster response
-            }
           }
         };
         
@@ -182,7 +171,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
           });
         };
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Camera Error:", error);
       toast({
         title: "Camera Access Failed",
@@ -193,83 +182,8 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
     }
   };
   
-  const startAutoCapture = () => {
-    startCamera(true);
-  };
-  
   const startManualCapture = () => {
-    startCamera(false);
-  };
-  
-  const startSmartAutoCapture = () => {
-    setIsSmartAutoCapture(true);
-    startCamera(true);
-  };
-  
-  // Advanced smart auto-capture with corner detection and alignment
-  const initiateSmartAutoCapture = () => {
-    if (!videoRef.current || !isSmartAutoCapture) return;
-    
-    const video = videoRef.current;
-    
-    // Check if video is ready
-    if (video.readyState >= video.HAVE_METADATA) {
-      // Create canvas to analyze video frame
-      const canvas = document.createElement('canvas');
-      const width = video.videoWidth || 640;
-      const height = video.videoHeight || 480;
-      canvas.width = width;
-      canvas.height = height;
-      
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        // If canvas context fails, capture immediately
-        capturePhoto();
-        setIsSmartAutoCapture(false);
-        return;
-      }
-      
-      // Draw video frame to canvas
-      ctx.drawImage(video, 0, 0, width, height);
-      
-      // Real card detection and alignment process
-      console.log('Detecting business card corners...');
-      
-      // Detect card boundaries using corner detection
-      const boundaries = detectCardBoundaries(ctx.getImageData(0, 0, width, height));
-      
-      // Draw card boundary for visual feedback
-      drawCardBoundary(canvas, boundaries);
-      
-      // Show alignment guidance
-      showAlignmentGuidance();
-      
-      // Adjust camera zoom to focus on card
-      adjustCameraZoom();
-      
-      // Check if card is properly positioned
-      if (isCardProperlyPositioned()) {
-        // Align card in frame
-        alignCard();
-        
-        // Wait for alignment to complete
-        setTimeout(() => {
-          console.log('Smart auto-capture: Card detected, aligned and captured!');
-          capturePhoto();
-          setIsSmartAutoCapture(false); // Stop smart capture after successful capture
-        }, 800);
-      } else {
-        // Card not properly positioned, wait and try again
-        setTimeout(() => {
-          if (isSmartAutoCapture) {
-            initiateSmartAutoCapture();
-          }
-        }, 1000);
-      }
-    } else {
-      // Video not ready yet, check again shortly
-      setTimeout(initiateSmartAutoCapture, 50);
-    }
+    startCamera();
   };
   
   // Function to detect card boundaries using corner detection
@@ -683,25 +597,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
             Use Camera
           </Button>
           
-          <Button
-            onClick={startAutoCapture}
-            variant="outline"
-            className="w-full border-green-500 text-green-500 hover:bg-green-500/10 transition-smooth shadow-soft text-xs py-2"
-            size="sm"
-          >
-            <Camera className="mr-1 h-3 w-3" />
-            Auto Capture
-          </Button>
-          
-          <Button
-            onClick={startSmartAutoCapture}
-            variant="outline"
-            className="w-full border-blue-500 text-blue-500 hover:bg-blue-500/10 transition-smooth shadow-soft text-xs py-2"
-            size="sm"
-          >
-            <Camera className="mr-1 h-3 w-3" />
-            Smart Auto Capture
-          </Button>
+
         </div>
 
         {showCamera && (
@@ -751,15 +647,5 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
     </Card>
   );
   
-  // Effect to start smart auto-capture when camera is ready
-  useEffect(() => {
-    if (isSmartAutoCapture && showCamera && videoRef.current) {
-      // Start the smart auto-capture analysis immediately
-      const timer = setTimeout(() => {
-        initiateSmartAutoCapture();
-      }, 300);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isSmartAutoCapture, showCamera]);
+
 };
