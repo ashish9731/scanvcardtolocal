@@ -157,6 +157,11 @@ const Index = () => {
               </div>
               <div className="p-6 bg-card rounded-xl border border-border shadow-sm">
                 <div className="text-2xl font-bold text-primary mb-2">03</div>
+                <h3 className="text-xl font-semibold mb-2">Privacy & Data Policy</h3>
+                <p className="text-muted-foreground">We do not store any data. Save your data before exiting.</p>
+              </div>
+              <div className="p-6 bg-card rounded-xl border border-border shadow-sm">
+                <div className="text-2xl font-bold text-primary mb-2">04</div>
                 <h3 className="text-xl font-semibold mb-2">Export & Share</h3>
                 <p className="text-muted-foreground">Export contacts to CSV or VCF format</p>
               </div>
