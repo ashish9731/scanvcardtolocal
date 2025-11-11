@@ -138,89 +138,78 @@ const Index = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Side - Capture Options */}
-            <div className="py-4 lg:col-span-2">
-              <div className="bg-gradient-to-br from-card to-muted rounded-2xl shadow-xl p-6 border border-border">
-                <h2 className="text-2xl font-bold text-foreground mb-6">Capture Business Card</h2>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Capture Section */}
-                  <div className="lg:col-span-2">
-                    <ImageCapture onImageCapture={handleImageCapture} />
-                  </div>
-                  
-                  {/* Tips Section */}
-                  <div className="bg-muted/50 rounded-xl p-4 border border-border">
-                    <h3 className="text-lg font-semibold text-foreground mb-3">Capture Tips</h3>
-                    <ul className="space-y-3 text-sm text-muted-foreground">
-                      <li className="flex items-start">
-                        <span className="text-primary mr-2">•</span>
-                        <span>Ensure good lighting when capturing cards</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="text-primary mr-2">•</span>
-                        <span>Position the card flat and straight</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="text-primary mr-2">•</span>
-                        <span>Capture the entire card, including all edges</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="text-primary mr-2">•</span>
-                        <span>Avoid glare or shadows on the card</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="text-primary mr-2">•</span>
-                        <span>Use a contrasting background for better results</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="text-primary mr-2">•</span>
-                        <span>Hold camera steady for clear images</span>
-                      </li>
-                    </ul>
-                    
-                    <div className="mt-4 pt-3 border-t border-border">
-                      <h4 className="font-medium text-foreground mb-2">Best Practices</h4>
-                      <p className="text-xs text-muted-foreground">
-                        For optimal results, ensure text is clear and legible. The OCR works best with standard fonts and good contrast.
-                      </p>
-                    </div>
-                  </div>
+          <div className="space-y-6">
+            {/* Capture Business Card Section */}
+            <div className="bg-card rounded-xl shadow-lg border border-border p-6">
+              <h2 className="text-2xl font-bold text-foreground mb-6">Capture Business Card</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Capture Section - 2/3 width */}
+                <div className="lg:col-span-2">
+                  <ImageCapture onImageCapture={handleImageCapture} />
+                </div>
+                
+                {/* Tips Section - 1/3 width */}
+                <div className="bg-muted rounded-lg p-4 border border-border">
+                  <h3 className="text-lg font-semibold text-foreground mb-3">Capture Tips</h3>
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    <li className="flex items-start">
+                      <span className="text-primary mr-2">•</span>
+                      <span>Ensure good lighting when capturing cards</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-primary mr-2">•</span>
+                      <span>Position the card flat and straight</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-primary mr-2">•</span>
+                      <span>Capture the entire card, including all edges</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-primary mr-2">•</span>
+                      <span>Avoid glare or shadows on the card</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-primary mr-2">•</span>
+                      <span>Use a contrasting background for better results</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            
+            {/* Scanned Cards Report Section */}
+            <div className="bg-card rounded-xl shadow-lg border border-border p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-foreground">Scanned Cards Report</h2>
+                <div className="text-sm text-muted-foreground">
+                  {cards.length} card{cards.length !== 1 ? 's' : ''} scanned
                 </div>
               </div>
               
-              {/* Scanned Cards Report Section */}
-              <div className="bg-gradient-to-br from-card to-muted rounded-2xl shadow-xl p-6 border border-border mt-6">
-                <h2 className="text-2xl font-bold text-foreground mb-6">Scanned Cards Report</h2>
-                
-                {isProcessing && (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center space-y-4">
-                      <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-                      <p className="text-lg text-muted-foreground">Processing your business card...</p>
-                    </div>
+              {isProcessing && (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center space-y-4">
+                    <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+                    <p className="text-lg text-muted-foreground">Processing your business card...</p>
                   </div>
-                )}
-                
-                {!isProcessing && cards.length > 0 && (
+                </div>
+              )}
+              
+              {!isProcessing && cards.length > 0 && (
+                <div className="overflow-hidden rounded-lg border border-border">
                   <CardDataTable
                     cards={cards}
                     onUpdateCard={handleUpdateCard}
                     onDeleteCard={handleDeleteCard}
                   />
-                )}
-                
-                {!isProcessing && cards.length === 0 && (
-                  <div className="text-center py-12">
-                    <p className="text-muted-foreground text-lg">No cards scanned yet. Upload or capture a business card to get started.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {/* Right Side - Empty Column */}
-            <div className="py-4 lg:col-span-1">
-              {/* Placeholder for future content or spacing */}
+                </div>
+              )}
+              
+              {!isProcessing && cards.length === 0 && (
+                <div className="text-center py-12 bg-muted/30 rounded-lg">
+                  <p className="text-muted-foreground text-lg">No cards scanned yet. Upload or capture a business card to get started.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
