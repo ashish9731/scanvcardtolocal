@@ -103,23 +103,6 @@ const Index = () => {
               </button>
             </div>
             
-            <div className="max-w-2xl mx-auto mt-6">
-              <div className="flex items-center justify-center mb-2">
-                <span className="mr-2">🔒</span>
-                <h3 className="font-semibold">Privacy & Data Policy</h3>
-              </div>
-              <ul className="text-sm space-y-1">
-                <li className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>We do not store any data</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>It is important that you save your data before you exit</span>
-                </li>
-              </ul>
-            </div>
-            
             <div className="max-w-2xl mx-auto mt-4">
               <div className="flex items-start">
                 <span className="mr-2">⚠️</span>
