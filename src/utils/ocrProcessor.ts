@@ -54,6 +54,8 @@ export const processImage = async (imageData: string): Promise<CardData> => {
       tessedit_pageseg_mode: '6' as unknown as Tesseract.PSM, // Assume a single uniform block of text (PSM.SINGLE_BLOCK)
       tessedit_ocr_engine_mode: '1' as unknown as Tesseract.OEM, // Use LSTM OCR Engine only (OEM.LSTM_ONLY)
       tessedit_do_invert: '0', // Skip inversion for better performance
+      preserve_interword_spaces: '1', // Preserve spaces between words
+      classify_bln_numeric_mode: '0', // Don't assume numeric mode
     });
     
     // Resize image for better performance if it's too large
@@ -156,27 +158,80 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     if (designation) break;
   }
   
-  // Enhanced name detection - look for capitalized names (2-4 words, no designation keywords)
-  for (let i = 0; i < Math.min(5, lines.length); i++) {
+  // Enhanced name detection - more flexible approach
+  for (let i = 0; i < Math.min(8, lines.length); i++) {
     const line = lines[i].trim();
     const words = line.split(' ');
-    const isAllCaps = line === line.toUpperCase() && line.length > 3;
-    const hasDesignation = designationKeywords.some(kw => line.toLowerCase().includes(kw.toLowerCase()));
+    
+    // Skip if line is empty
+    if (!line) continue;
+    
+    // Skip if it's clearly not a name
+    const isTooLong = line.length > 50;
     const hasNumbers = /\d/.test(line);
     const hasEmail = emails.some(e => line.toLowerCase().includes(e));
     const hasPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
+    const isWebsite = line.toLowerCase().includes('www.') || line.toLowerCase().includes('.com') || line.toLowerCase().includes('.org');
     
-    // Name is likely: all caps or capitalized, 2-4 words, no designation/numbers/email/phone
-    if (line && 
-        words.length >= 2 && 
-        words.length <= 4 &&
-        (isAllCaps || /^[A-Z][a-z]/.test(line)) &&
-        !hasDesignation &&
-        !hasNumbers &&
-        !hasEmail &&
-        !hasPhone) {
-      name = line;
-      break;
+    if (isTooLong || hasNumbers || hasEmail || hasPhone || isWebsite) continue;
+    
+    // Check if it's a designation
+    const isDesignation = designationKeywords.some(kw => 
+      line.toLowerCase().includes(kw.toLowerCase())
+    );
+    
+    if (isDesignation) continue;
+    
+    // Look for potential names:
+    // 1. All caps (common for names on business cards)
+    // 2. Properly capitalized (First Last)
+    // 3. Reasonable length (2-4 words)
+    
+    const isAllCaps = line === line.toUpperCase() && line.length > 2;
+    const isProperlyCapitalized = /^[A-Z][a-z]+(\s[A-Z][a-z]+)*$/.test(line);
+    const isReasonableLength = words.length >= 1 && words.length <= 4;
+    
+    if (isReasonableLength && (isAllCaps || isProperlyCapitalized)) {
+      // Additional validation: check if it looks like a real name
+      // Names typically don't have too many consecutive capital letters
+      const consecutiveCaps = (line.match(/[A-Z]{3,}/g) || []).length;
+      
+      if (consecutiveCaps === 0 || (consecutiveCaps === 1 && isAllCaps)) {
+        name = line;
+        break;
+      }
+    }
+    
+    // Fallback: if we haven't found a name yet and this line looks plausible
+    if (!name && words.length >= 2 && words.length <= 3 && /^[A-Z]/.test(line)) {
+      // Check that it doesn't contain obvious non-name words
+      const nonNameIndicators = ['inc', 'llc', 'ltd', 'corp', 'company', 'group', 'solutions'];
+      const containsNonName = nonNameIndicators.some(indicator => 
+        line.toLowerCase().includes(indicator)
+      );
+      
+      if (!containsNonName) {
+        name = line;
+      }
+    }
+  }
+  
+  // Final fallback: if no name found, try to find any capitalized line that might be a name
+  if (!name) {
+    for (let i = 0; i < Math.min(6, lines.length); i++) {
+      const line = lines[i].trim();
+      if (line && /^[A-Z][a-z]+(\s[A-Z][a-z]+)*$/.test(line) && line.length <= 30) {
+        // Check it's not a company by looking for company indicators
+        const companyIndicators = ['inc', 'llc', 'ltd', 'corp', 'company', 'group'];
+        const isLikelyCompany = companyIndicators.some(indicator => 
+          line.toLowerCase().includes(indicator)
+        );
+        
+        if (!isLikelyCompany) {
+          name = line;
+          break;
+        }
+      }
     }
   }
   
@@ -191,9 +246,16 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   // Common company suffixes that help identify company names
   const companySuffixes = ['Inc', 'LLC', 'Ltd', 'Corp', 'Corporation', 'Company', 'Co', 'Group', 'Associates', 'Partners', 'Enterprises', 'Solutions', 'Technologies', 'Tech', 'Industries', 'Holdings', 'Ventures', 'Capital'];
   
+  // Common words that indicate it's NOT a company name (likely a person's name)
+  const nameIndicators = ['Mr', 'Mrs', 'Ms', 'Dr', 'Prof'];
+  
   for (let i = 0; i < logoAreaLines.length; i++) {
     const line = logoAreaLines[i].trim();
     const words = line.split(' ');
+    
+    // Skip if line is empty
+    if (!line) continue;
+    
     const isAllCaps = line === line.toUpperCase() && line.length > 1;
     const hasNumbers = /\d/.test(line);
     const isPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
@@ -201,20 +263,16 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     const isDesignation = designationKeywords.some(kw => line.toLowerCase().includes(kw.toLowerCase()));
     const isName = line === name;
     const hasCompanySuffix = companySuffixes.some(suffix => line.toLowerCase().includes(suffix.toLowerCase()));
+    const hasNameIndicator = nameIndicators.some(indicator => line.toLowerCase().includes(indicator.toLowerCase()));
+    
+    // Skip if it's clearly not a company
+    if (isName || isEmail || isPhone || isDesignation || hasNameIndicator || hasNumbers) continue;
     
     // Enhanced company detection logic:
     // - All caps text in logo area (often company names/logos)
     // - Multiple words (2-6) that don't contain numbers
     // - Contains company suffixes
-    // - Not identified as name, phone, email, or designation
-    if (line && 
-        !isName &&
-        !isEmail && 
-        !isPhone &&
-        !isDesignation &&
-        line.length > 1 &&
-        (isAllCaps || (words.length >= 2 && words.length <= 6) || hasCompanySuffix) &&
-        !hasNumbers) {
+    if (line.length > 1 && (isAllCaps || (words.length >= 2 && words.length <= 6) || hasCompanySuffix)) {
       // Additional check: if it's all caps and short, it's likely a company/logo
       if (isAllCaps && line.length <= 30) {
         companyFromText = line;
