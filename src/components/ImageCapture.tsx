@@ -88,36 +88,69 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
         setCameraStream(null);
       }
 
-      // Request camera access with simple constraints for immediate response
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: true
-      });
+      // Request camera access with specific constraints for better compatibility
+      const constraints = {
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+      
+      // Try environment camera first
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (envError) {
+        // Fallback to user-facing camera
+        console.warn('Environment camera failed, trying user camera:', envError);
+        constraints.video.facingMode = 'user';
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      }
       
       setCameraStream(stream);
       setShowCamera(true);
       
-      // Attach stream to video element immediately
+      // Attach stream to video element
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Play the video immediately
-        videoRef.current.play().catch(err => console.warn('Video play failed:', err));
-                
-        // Small delay to ensure video is ready
-        setTimeout(() => {
-          if (videoRef.current) {
-            videoRef.current.classList.add('video-ready');
-          }
-        }, 500);
+        
+        // Add event listeners for better control
+        videoRef.current.onloadedmetadata = () => {
+          console.log('Video metadata loaded');
+          videoRef.current?.play().catch(err => {
+            console.warn('Video play failed:', err);
+            toast({
+              title: "Camera Error",
+              description: "Failed to start camera. Please try again.",
+              variant: "destructive",
+            });
+          });
+        };
+        
+        videoRef.current.onerror = (err) => {
+          console.error('Video error:', err);
+          toast({
+            title: "Camera Error",
+            description: "Failed to access camera. Please check permissions.",
+            variant: "destructive",
+          });
+        };
       }
     } catch (error) {
-      console.warn('Camera access failed:', error);
+      console.error('Camera access failed:', error);
       toast({
-        title: "Camera Access Denied",
-        description: "Please ensure camera permissions are granted and try again.",
+        title: "Camera Access Failed",
+        description: "Unable to access camera. Please ensure permissions are granted.",
         variant: "destructive",
       });
-      // Hide camera view on error
-      setShowCamera(false);
+      
+      // Fallback to file input method
+      setTimeout(() => {
+        if (cameraInputRef.current) {
+          cameraInputRef.current.click();
+        }
+      }, 100);
     }
   };
 
@@ -131,7 +164,21 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
       cameraInput.setAttribute("capture", "environment");
       
       // Click the input directly
-      cameraInput.click();
+      try {
+        cameraInput.click();
+      } catch (error) {
+        console.warn('Environment camera failed, trying user camera:', error);
+        // Fallback to user-facing camera
+        try {
+          cameraInput.setAttribute("capture", "user");
+          cameraInput.click();
+        } catch (userError) {
+          console.warn('User camera failed, opening file dialog:', userError);
+          // Final fallback: open file dialog without capture attribute
+          cameraInput.removeAttribute("capture");
+          cameraInput.click();
+        }
+      }
     }
   };
 
@@ -149,13 +196,17 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
         return;
       }
       
+      // Create canvas with actual video dimensions
       const canvas = document.createElement('canvas');
-      // Use video dimensions or default to 1280x720
-      canvas.width = video.videoWidth || 1280;
-      canvas.height = video.videoHeight || 720;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
       
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        // Fill canvas with black background first
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
         // Draw the video frame
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
@@ -171,6 +222,12 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
         }
         setShowCamera(false);
       }
+    } else {
+      toast({
+        title: "Camera Error",
+        description: "Camera not available. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
