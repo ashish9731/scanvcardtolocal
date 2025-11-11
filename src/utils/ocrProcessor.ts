@@ -355,11 +355,43 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     }
   }
   
+  // Ensure name is always extracted from email if not found in text
+  let finalName = name || '';
+  if (!finalName && emails.length > 0) {
+    // Extract username from email (part before @)
+    const emailParts = emails[0].split('@');
+    if (emailParts.length === 2) {
+      const username = emailParts[0];
+      // Convert username to proper name format (replace dots with spaces and capitalize)
+      finalName = username.replace(/\./g, ' ') // Replace dots with spaces
+        .replace(/\b\w/g, char => char.toUpperCase()) // Capitalize first letter of each word
+        .trim();
+    }
+  }
+  
+  // Ensure company name is always extracted from email domain if not found in text
+  let finalCompany = company || '';
+  if (!finalCompany && emails.length > 0) {
+    // Extract domain from email (part after @)
+    const emailParts = emails[0].split('@');
+    if (emailParts.length === 2) {
+      const domain = emailParts[1];
+      // Extract company name from domain (remove .com, .org, etc.)
+      const domainParts = domain.split('.');
+      if (domainParts.length >= 2) {
+        finalCompany = domainParts[0].charAt(0).toUpperCase() + domainParts[0].slice(1);
+      }
+    }
+  }
+  
+  // Ensure email is always populated if we have one
+  const finalEmail = emails[0] || '';
+  
   return {
-    name: name || '',
-    company: company || '',
+    name: finalName,
+    company: finalCompany,
     designation: designation || '',
-    email: emails[0] || '',
+    email: finalEmail,
     phone: phones[0] || '',
     website: websiteFromEmail || '',
     address: address || '',
