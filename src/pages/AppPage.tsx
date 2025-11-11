@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ImageCapture } from "@/components/ImageCapture";
 import { CardDataTable } from "@/components/CardDataTable";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -13,11 +13,40 @@ const AppPage = () => {
   const [cards, setCards] = useState<CardData[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingQueue, setProcessingQueue] = useState<number>(0);
+  const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
   const { toast } = useToast();
-  const { signOut } = useAuth();
+  const { signOut, user, getCouponDaysRemaining } = useAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (user) {
+      const remaining = getCouponDaysRemaining();
+      setDaysRemaining(remaining);
+      
+      // Check if trial has expired
+      if (remaining !== null && remaining <= 0) {
+        toast({
+          title: "Access Expired",
+          description: "Your free trial period has ended. Please upgrade to continue using the service.",
+          variant: "destructive",
+        });
+        navigate('/');
+      }
+    }
+  }, [user, navigate, toast]);
+
   const handleImageCapture = async (imageData: string) => {
+    // Check if trial has expired before processing
+    const remaining = getCouponDaysRemaining();
+    if (remaining !== null && remaining <= 0) {
+      toast({
+        title: "Access Expired",
+        description: "Your free trial period has ended. Please upgrade to continue using the service.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Increment the processing queue
     setProcessingQueue(prev => prev + 1);
     
@@ -94,6 +123,11 @@ const AppPage = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <h1 className="text-2xl font-bold text-foreground">Business Card Scanner</h1>
         <div className="flex items-center gap-4">
+          {daysRemaining !== null && (
+            <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+              {daysRemaining} days left
+            </div>
+          )}
           <ThemeToggle />
           <Button onClick={handleLogout} variant="outline" size="sm">
             Logout

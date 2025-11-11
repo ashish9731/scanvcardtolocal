@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ImageCapture } from "@/components/ImageCapture";
 import { CardDataTable } from "@/components/CardDataTable";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -15,9 +15,19 @@ const Index = () => {
   const [processingQueue, setProcessingQueue] = useState<number>(0);
   const [processedCount, setProcessedCount] = useState<number>(0);
   const [showApp, setShowApp] = useState(false);
+  const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, signOut, getCouponDaysRemaining } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      const remaining = getCouponDaysRemaining();
+      setDaysRemaining(remaining);
+    } else {
+      setDaysRemaining(null);
+    }
+  }, [user]);
 
   const handleImageCapture = async (imageData: string) => {
     // Increment the processing queue
@@ -108,7 +118,12 @@ const Index = () => {
       {!showApp ? (
         // Hero Section with CTA
         <div className="max-w-4xl mx-auto px-4 py-16 md:py-24 text-center">
-          <div className="absolute top-4 right-4 flex gap-2">
+          <div className="absolute top-4 right-4 flex gap-2 items-center">
+            {daysRemaining !== null && (
+              <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                {daysRemaining} days left
+              </div>
+            )}
             {user ? (
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 Logout
@@ -143,6 +158,12 @@ const Index = () => {
               >
                 Start Capturing Cards
               </button>
+            </div>
+            
+            <div className="pt-4">
+              <div className="inline-block bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded-lg">
+                <p className="font-medium">Unlock 60 Days FREE! Sign up and scan smarter with Business Card Scanner — Use code <span className="font-bold">BCS60</span>.</p>
+              </div>
             </div>
             
             <div className="max-w-2xl mx-auto mt-4">
