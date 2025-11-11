@@ -94,10 +94,10 @@ const Index = () => {
               Digitize business cards instantly with powerful OCR technology. Capture, extract, and manage contact information effortlessly.
             </p>
             
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-2xl mx-auto mt-6">
+            <div className="max-w-2xl mx-auto mt-6">
               <div className="flex items-start">
-                <span className="text-yellow-600 mr-2">⚠️</span>
-                <p className="text-yellow-800 text-sm">
+                <span className="mr-2">⚠️</span>
+                <p className="text-sm">
                   <strong>Disclaimer:</strong> This app can throw up any error, so please cross verify the details.
                 </p>
               </div>
@@ -112,12 +112,12 @@ const Index = () => {
               </button>
             </div>
             
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl mx-auto mt-6">
+            <div className="max-w-2xl mx-auto mt-6">
               <div className="flex items-center justify-center mb-2">
-                <span className="text-blue-600 mr-2">🔒</span>
-                <h3 className="font-semibold text-blue-800">Privacy & Data Policy</h3>
+                <span className="mr-2">🔒</span>
+                <h3 className="font-semibold">Privacy & Data Policy</h3>
               </div>
-              <ul className="text-blue-800 text-sm space-y-1">
+              <ul className="text-sm space-y-1">
                 <li className="flex items-start">
                   <span className="mr-2">•</span>
                   <span>We do not store any data</span>
@@ -129,9 +129,18 @@ const Index = () => {
               </ul>
             </div>
             
-            <div className="mt-6 text-muted-foreground">
-              <p className="text-lg">
-                Join <span className="font-bold text-primary">10,000+</span> users who are already saving hours of time by using BCS
+            <div className="max-w-2xl mx-auto mt-4">
+              <div className="flex items-start">
+                <span className="mr-2">⚠️</span>
+                <p className="text-sm">
+                  <strong>Disclaimer:</strong> This app can throw up any error, so please cross verify the details.
+                </p>
+              </div>
+            </div>
+            
+            <div className="mt-8 text-muted-foreground">
+              <p className="text-2xl md:text-3xl font-bold">
+                Join <span className="text-primary">10,000+</span> users who are already saving hours of time by using BCS
               </p>
             </div>
             
@@ -204,10 +213,10 @@ const Index = () => {
             </div>
           </div>
           
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6">
+          <div className="mb-6">
             <div className="flex items-start">
-              <span className="text-yellow-600 mr-2 mt-0.5">⚠️</span>
-              <p className="text-yellow-800 text-sm">
+              <span className="mr-2 mt-0.5">⚠️</span>
+              <p className="text-sm">
                 <strong>Disclaimer:</strong> This app can throw up any error, so please cross verify the details.
               </p>
             </div>
