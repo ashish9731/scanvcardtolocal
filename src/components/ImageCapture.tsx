@@ -109,14 +109,15 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
       
       // Auto-capture mode removed
 
-      // Try environment camera first
+      // Try environment camera first (rear camera for mobile)
       let stream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
+            // More flexible constraints for mobile devices
+            width: { min: 640, ideal: 1280, max: 1920 },
+            height: { min: 480, ideal: 720, max: 1080 }
           }
         });
       } catch (envError) {
@@ -126,8 +127,9 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
           stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: { ideal: "user" },
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
+              // More flexible constraints for mobile devices
+              width: { min: 640, ideal: 1280, max: 1920 },
+              height: { min: 480, ideal: 720, max: 1080 }
             }
           });
         } catch (userError) {
@@ -145,6 +147,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.setAttribute("playsinline", ""); // iOS fix
+        videoRef.current.setAttribute("muted", ""); // Required for autoplay in some browsers
         
         // Add event listeners for better control
         videoRef.current.onloadedmetadata = () => {
@@ -404,6 +407,9 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
       const cameraInput = cameraInputRef.current;
       cameraInput.setAttribute("capture", "environment");
       
+      // Add mobile-specific attributes
+      cameraInput.setAttribute("accept", "image/*");
+      
       // Click the input directly with minimal delay to ensure DOM is ready
       setTimeout(() => {
         if (cameraInputRef.current) {
@@ -423,7 +429,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
             }
           }
         }
-      }, 50);
+      }, 100); // Increased delay for mobile devices
     }
   };
 
@@ -464,8 +470,8 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
           // If draw fails, at least we have the black background
         }
         
-        // Convert to JPEG with good quality
-        const imageData = canvas.toDataURL('image/jpeg', 0.95); // High quality for better OCR
+        // Convert to JPEG with good quality for OCR
+        const imageData = canvas.toDataURL('image/jpeg', 0.92); // Slightly reduced quality for faster processing
         setPreview(imageData);
         onImageCapture(imageData);
         
