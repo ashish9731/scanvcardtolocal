@@ -138,19 +138,60 @@ const Index = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Side - Capture Options */}
-            <div className="py-4 md:col-span-1">
-              <div className="bg-gradient-to-br from-card to-muted rounded-2xl shadow-xl p-4 border border-border h-full">
-                <h2 className="text-xl font-bold text-foreground mb-4">Capture Business Card</h2>
-                <ImageCapture onImageCapture={handleImageCapture} />
+            <div className="py-4 lg:col-span-2">
+              <div className="bg-gradient-to-br from-card to-muted rounded-2xl shadow-xl p-6 border border-border">
+                <h2 className="text-2xl font-bold text-foreground mb-6">Capture Business Card</h2>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Capture Section */}
+                  <div className="lg:col-span-2">
+                    <ImageCapture onImageCapture={handleImageCapture} />
+                  </div>
+                  
+                  {/* Tips Section */}
+                  <div className="bg-muted/50 rounded-xl p-4 border border-border">
+                    <h3 className="text-lg font-semibold text-foreground mb-3">Capture Tips</h3>
+                    <ul className="space-y-3 text-sm text-muted-foreground">
+                      <li className="flex items-start">
+                        <span className="text-primary mr-2">•</span>
+                        <span>Ensure good lighting when capturing cards</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="text-primary mr-2">•</span>
+                        <span>Position the card flat and straight</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="text-primary mr-2">•</span>
+                        <span>Capture the entire card, including all edges</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="text-primary mr-2">•</span>
+                        <span>Avoid glare or shadows on the card</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="text-primary mr-2">•</span>
+                        <span>Use a contrasting background for better results</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="text-primary mr-2">•</span>
+                        <span>Hold camera steady for clear images</span>
+                      </li>
+                    </ul>
+                    
+                    <div className="mt-4 pt-3 border-t border-border">
+                      <h4 className="font-medium text-foreground mb-2">Best Practices</h4>
+                      <p className="text-xs text-muted-foreground">
+                        For optimal results, ensure text is clear and legible. The OCR works best with standard fonts and good contrast.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-            
-            {/* Right Side - Report/Results */}
-            <div className="py-4 md:col-span-2">
-              <div className="bg-gradient-to-br from-card to-muted rounded-2xl shadow-xl p-6 border border-border h-full">
-                <h2 className="text-2xl font-bold text-foreground">Scanned Cards Report</h2>
+              
+              {/* Scanned Cards Report Section */}
+              <div className="bg-gradient-to-br from-card to-muted rounded-2xl shadow-xl p-6 border border-border mt-6">
+                <h2 className="text-2xl font-bold text-foreground mb-6">Scanned Cards Report</h2>
                 
                 {isProcessing && (
                   <div className="flex items-center justify-center py-12">
@@ -174,6 +215,37 @@ const Index = () => {
                     <p className="text-muted-foreground text-lg">No cards scanned yet. Upload or capture a business card to get started.</p>
                   </div>
                 )}
+              </div>
+            </div>
+            
+            {/* Right Side - Report/Results (Moved to left with new layout) */}
+            <div className="py-4 lg:col-span-1">
+              <div className="bg-gradient-to-br from-card to-muted rounded-2xl shadow-xl p-6 border border-border h-full">
+                <h2 className="text-2xl font-bold text-foreground mb-4">Quick Stats</h2>
+                
+                <div className="space-y-4">
+                  <div className="bg-muted/50 rounded-xl p-4 border border-border">
+                    <div className="text-3xl font-bold text-primary">{cards.length}</div>
+                    <div className="text-muted-foreground">Cards Scanned</div>
+                  </div>
+                  
+                  <div className="bg-muted/50 rounded-xl p-4 border border-border">
+                    <div className="text-3xl font-bold text-primary">{cards.filter(card => card.email).length}</div>
+                    <div className="text-muted-foreground">Emails Extracted</div>
+                  </div>
+                  
+                  <div className="bg-muted/50 rounded-xl p-4 border border-border">
+                    <div className="text-3xl font-bold text-primary">{cards.filter(card => card.phone).length}</div>
+                    <div className="text-muted-foreground">Phone Numbers</div>
+                  </div>
+                  
+                  <div className="pt-4 mt-4 border-t border-border">
+                    <h3 className="font-semibold text-foreground mb-2">Export Options</h3>
+                    <p className="text-sm text-muted-foreground">
+                      After scanning cards, use the export buttons in the report section to save your data in CSV or VCF format.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
