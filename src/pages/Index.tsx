@@ -94,6 +94,15 @@ const Index = () => {
               Digitize business cards instantly with powerful OCR technology. Capture, extract, and manage contact information effortlessly.
             </p>
             
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-2xl mx-auto mt-6">
+              <div className="flex items-start">
+                <span className="text-yellow-600 mr-2">⚠️</span>
+                <p className="text-yellow-800 text-sm">
+                  <strong>Disclaimer:</strong> This app can throw up any error, so please cross verify the details.
+                </p>
+              </div>
+            </div>
+            
             <div className="pt-8">
               <button
                 onClick={() => setShowApp(true)}
@@ -101,6 +110,29 @@ const Index = () => {
               >
                 Start Capturing Cards
               </button>
+            </div>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl mx-auto mt-6">
+              <div className="flex items-center justify-center mb-2">
+                <span className="text-blue-600 mr-2">🔒</span>
+                <h3 className="font-semibold text-blue-800">Privacy & Data Policy</h3>
+              </div>
+              <ul className="text-blue-800 text-sm space-y-1">
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>We do not store any data</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>It is important that you save your data before you exit</span>
+                </li>
+              </ul>
+            </div>
+            
+            <div className="mt-6 text-muted-foreground">
+              <p className="text-lg">
+                Join <span className="font-bold text-primary">10,000+</span> users who are already saving hours of time by using BCS
+              </p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-12 max-w-4xl mx-auto">
@@ -120,6 +152,40 @@ const Index = () => {
                 <p className="text-muted-foreground">Export contacts to CSV or VCF format</p>
               </div>
             </div>
+            
+            <div className="pt-8 max-w-4xl mx-auto">
+              <h3 className="text-xl font-semibold text-foreground mb-4 text-center">Additional Benefits</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-start p-4 bg-muted/50 rounded-lg border border-border">
+                  <span className="text-primary mr-2">✓</span>
+                  <div>
+                    <h4 className="font-medium text-foreground">Editable Table</h4>
+                    <p className="text-sm text-muted-foreground">Easily edit and improve extracted information</p>
+                  </div>
+                </div>
+                <div className="flex items-start p-4 bg-muted/50 rounded-lg border border-border">
+                  <span className="text-primary mr-2">✓</span>
+                  <div>
+                    <h4 className="font-medium text-foreground">Multiple Export Options</h4>
+                    <p className="text-sm text-muted-foreground">Export to CSV, VCF, or send directly via Gmail</p>
+                  </div>
+                </div>
+                <div className="flex items-start p-4 bg-muted/50 rounded-lg border border-border">
+                  <span className="text-primary mr-2">✓</span>
+                  <div>
+                    <h4 className="font-medium text-foreground">Batch Processing</h4>
+                    <p className="text-sm text-muted-foreground">Process multiple cards at once</p>
+                  </div>
+                </div>
+                <div className="flex items-start p-4 bg-muted/50 rounded-lg border border-border">
+                  <span className="text-primary mr-2">✓</span>
+                  <div>
+                    <h4 className="font-medium text-foreground">Cross-Platform</h4>
+                    <p className="text-sm text-muted-foreground">Works on mobile and desktop browsers</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       ) : (
@@ -135,6 +201,15 @@ const Index = () => {
               >
                 ← Back to Home
               </button>
+            </div>
+          </div>
+          
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6">
+            <div className="flex items-start">
+              <span className="text-yellow-600 mr-2 mt-0.5">⚠️</span>
+              <p className="text-yellow-800 text-sm">
+                <strong>Disclaimer:</strong> This app can throw up any error, so please cross verify the details.
+              </p>
             </div>
           </div>
           
