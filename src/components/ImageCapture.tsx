@@ -654,7 +654,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
               ref={videoRef}
               autoPlay
               playsInline
-              className="w-full h-auto max-h-96 object-contain"
+              className="w-full h-auto max-h-96 object-contain bg-transparent"
             />
             <div className="flex gap-2 mt-2">
               <Button
@@ -679,7 +679,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
             <img
               src={preview}
               alt="Business card preview"
-              className="w-full h-auto max-h-96 object-contain"
+              className="w-full h-auto max-h-96 object-contain bg-transparent"
             />
             <Button
               onClick={clearImage}
