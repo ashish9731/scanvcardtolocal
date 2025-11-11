@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Download, Trash2, Edit2, Check, X, Mail } from "lucide-react";
+import { Download, Trash2, Edit2, Check, X, Mail, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Papa from "papaparse";
 import JSZip from "jszip";
@@ -19,6 +19,7 @@ export const CardDataTable = ({ cards, onUpdateCard, onDeleteCard }: CardDataTab
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<CardData | null>(null);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isSavingToGoogle, setIsSavingToGoogle] = useState(false);
   const { toast } = useToast();
 
   const startEdit = (card: CardData) => {
@@ -296,6 +297,98 @@ Best regards,
     }
   };
 
+  const handleSaveToGoogleContacts = () => {
+    if (cards.length === 0) {
+      toast({
+        title: "No data to save",
+        description: "Please scan some business cards first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSavingToGoogle(true);
+      
+      // Generate VCF content for all cards
+      let vcfContent = "";
+      cards.forEach((card, index) => {
+        vcfContent += "BEGIN:VCARD\n";
+        vcfContent += "VERSION:3.0\n";
+        
+        // Add name
+        if (card.name) {
+          const nameParts = card.name.split(" ");
+          const firstName = nameParts[0] || "";
+          const lastName = nameParts.slice(1).join(" ") || "";
+          vcfContent += `N:${lastName};${firstName};;;\n`;
+          vcfContent += `FN:${card.name}\n`;
+        }
+        
+        // Add organization
+        if (card.company) {
+          vcfContent += `ORG:${card.company}\n`;
+        }
+        
+        // Add title
+        if (card.designation) {
+          vcfContent += `TITLE:${card.designation}\n`;
+        }
+        
+        // Add email
+        if (card.email) {
+          vcfContent += `EMAIL;TYPE=WORK:${card.email}\n`;
+        }
+        
+        // Add phone
+        if (card.phone) {
+          vcfContent += `TEL;TYPE=WORK:${card.phone}\n`;
+        }
+        
+        // Add website
+        if (card.website) {
+          vcfContent += `URL:${card.website}\n`;
+        }
+        
+        // Add address
+        if (card.address) {
+          vcfContent += `ADR;TYPE=WORK:;;${card.address}\n`;
+        }
+        
+        vcfContent += "END:VCARD\n\n";
+      });
+
+      // Create blob and trigger download
+      const blob = new Blob([vcfContent], { type: "text/vcard" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `business-cards-google-${Date.now()}.vcf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      // Open Google Contacts import page
+      window.open("https://contacts.google.com/import", "_blank");
+      
+      toast({
+        title: "Google Contacts Preparation",
+        description: "VCF file downloaded. Google Contacts import page opened. Please import the downloaded file.",
+      });
+    } catch (error) {
+      console.error("Error saving to Google Contacts:", error);
+      toast({
+        title: "Save Failed",
+        description: "Failed to prepare Google Contacts import. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingToGoogle(false);
+    }
+  };
+
+
 
   if (cards.length === 0) {
     return (
@@ -323,6 +416,14 @@ Best regards,
           >
             <Download className="mr-1 h-4 w-4" />
             VCF
+          </Button>
+          <Button
+            onClick={handleSaveToGoogleContacts}
+            disabled={isSavingToGoogle}
+            className="bg-green-600 hover:bg-green-700 text-white transition-smooth shadow-soft text-sm py-2 px-3"
+          >
+            <Users className="mr-1 h-4 w-4" />
+            {isSavingToGoogle ? 'Saving...' : 'Google Contacts'}
           </Button>
           <Button
             onClick={handleSendEmail}
