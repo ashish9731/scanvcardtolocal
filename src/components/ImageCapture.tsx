@@ -12,6 +12,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
   const [preview, setPreview] = useState<string | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [showCamera, setShowCamera] = useState(false);
+  const [isAutoCapture, setIsAutoCapture] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -80,13 +81,16 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
     setShowCamera(false);
   };
 
-  const startCamera = async () => {
+  const startCamera = async (autoCapture = false) => {
     try {
       // Stop any existing stream
       if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
         setCameraStream(null);
       }
+      
+      // Set auto-capture mode
+      setIsAutoCapture(autoCapture);
 
       // Try environment camera first
       let stream;
@@ -137,6 +141,15 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
                 description: "Camera loaded but playback failed. You can still capture photos.",
               });
             });
+            
+            // If auto-capture is enabled, capture after a short delay
+            if (autoCapture) {
+              setTimeout(() => {
+                if (videoRef.current && showCamera) {
+                  capturePhoto();
+                }
+              }, 2000); // Auto-capture after 2 seconds
+            }
           }
         };
         
@@ -159,6 +172,15 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
       setShowCamera(false);
     }
   };
+  
+  const startAutoCapture = () => {
+    startCamera(true);
+  };
+  
+  const startManualCapture = () => {
+    startCamera(false);
+  };
+
 
   const fallbackToInputMethod = () => {
     if (cameraInputRef.current) {
@@ -287,13 +309,23 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
           />
           
           <Button
-            onClick={startCamera}
+            onClick={startManualCapture}
             variant="outline"
             className="w-full border-primary text-primary hover:bg-primary/10 transition-smooth shadow-soft text-xs py-2"
             size="sm"
           >
             <Camera className="mr-1 h-3 w-3" />
             Use Camera
+          </Button>
+          
+          <Button
+            onClick={startAutoCapture}
+            variant="outline"
+            className="w-full border-green-500 text-green-500 hover:bg-green-500/10 transition-smooth shadow-soft text-xs py-2"
+            size="sm"
+          >
+            <Camera className="mr-1 h-3 w-3" />
+            Auto Capture
           </Button>
         </div>
 

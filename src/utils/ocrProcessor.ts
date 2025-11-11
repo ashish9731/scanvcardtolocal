@@ -51,8 +51,6 @@ export const processImage = async (imageData: string): Promise<CardData> => {
   try {
     // Configure worker for better performance with business cards
     await worker.setParameters({
-      tessedit_pageseg_mode: '6' as unknown as Tesseract.PSM, // Assume a single uniform block of text (PSM.SINGLE_BLOCK)
-      tessedit_ocr_engine_mode: '1' as unknown as Tesseract.OEM, // Use LSTM OCR Engine only (OEM.LSTM_ONLY)
       tessedit_do_invert: '0', // Skip inversion for better performance
       preserve_interword_spaces: '1', // Preserve spaces between words
       classify_bln_numeric_mode: '0', // Don't assume numeric mode
