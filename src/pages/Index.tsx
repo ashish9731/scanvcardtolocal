@@ -161,8 +161,8 @@ const Index = () => {
             </div>
             
             <div className="pt-4">
-              <div className="inline-block bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded-lg">
-                <p className="font-medium">Unlock 60 Days FREE! Sign up and scan smarter with Business Card Scanner — Use code <span className="font-bold">BCS60</span>.</p>
+              <div className="inline-block border border-yellow-400 text-yellow-800 px-4 py-2 rounded-lg">
+                <p className="font-bold text-lg md:text-xl">Unlock 60 Days FREE! Sign up and scan smarter with Business Card Scanner — Use code <span className="font-extrabold">BCS60</span>.</p>
               </div>
             </div>
             
