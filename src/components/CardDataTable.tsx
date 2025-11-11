@@ -171,10 +171,7 @@ export const CardDataTable = ({ cards, onUpdateCard, onDeleteCard }: CardDataTab
         vcfContent += `ADR;TYPE=WORK:;;${card.address}\n`;
       }
       
-      // Add LinkedIn URL if available
-      if (card.linkedinUrl) {
-        vcfContent += `URL:${card.linkedinUrl}\n`;
-      }
+
       
       vcfContent += "END:VCARD\n\n";
     });
@@ -339,7 +336,7 @@ Best regards,
       </div>
       
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1100px] md:min-w-[1000px] border-collapse">
+        <table className="w-full min-w-[1000px] md:min-w-[900px] border-collapse">
           <thead>
             <tr className="border-b-2 border-border">
               <th className="text-left p-3 font-semibold text-foreground">Name</th>
@@ -348,7 +345,6 @@ Best regards,
               <th className="text-left p-3 font-semibold text-foreground">Email</th>
               <th className="text-left p-3 font-semibold text-foreground">Phone</th>
               <th className="text-left p-3 font-semibold text-foreground">Website</th>
-              <th className="text-left p-3 font-semibold text-foreground">LinkedIn</th>
               <th className="text-left p-3 font-semibold text-foreground">Address</th>
               <th className="text-left p-3 font-semibold text-foreground">Image</th>
               <th className="text-left p-3 font-semibold text-foreground">Actions</th>
@@ -403,13 +399,6 @@ Best regards,
                     </td>
                     <td className="p-2">
                       <Input
-                        value={editData.linkedinUrl || ''}
-                        onChange={(e) => setEditData({ ...editData, linkedinUrl: e.target.value })}
-                        className="min-w-[150px]"
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Input
                         value={editData.address}
                         onChange={(e) => setEditData({ ...editData, address: e.target.value })}
                         className="min-w-[200px]"
@@ -439,20 +428,6 @@ Best regards,
                     <td className="p-3 text-foreground">{card.email}</td>
                     <td className="p-3 text-foreground">{card.phone}</td>
                     <td className="p-3 text-foreground">{card.website}</td>
-                    <td className="p-3 text-foreground max-w-[150px] truncate">
-                      {card.linkedinUrl ? (
-                        <a 
-                          href={card.linkedinUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline truncate block"
-                        >
-                          LinkedIn Profile
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground">Not found</span>
-                      )}
-                    </td>
                     <td className="p-3 text-foreground max-w-[200px] truncate" title={card.address}>
                       {card.address}
                     </td>

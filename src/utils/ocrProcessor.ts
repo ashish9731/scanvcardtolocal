@@ -43,7 +43,6 @@ export interface CardData {
   website: string;
   address: string;
   imageData: string; // Base64 encoded image data
-  linkedinUrl?: string; // Optional LinkedIn profile URL
 }
 
 export const processImage = async (imageData: string): Promise<CardData> => {

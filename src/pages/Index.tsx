@@ -12,7 +12,6 @@ const Index = () => {
   const [processingQueue, setProcessingQueue] = useState<number>(0);
   const [processedCount, setProcessedCount] = useState<number>(0);
   const [showApp, setShowApp] = useState(false);
-  const [isLinkedInSearching, setIsLinkedInSearching] = useState(false);
   const { toast } = useToast();
 
   const handleImageCapture = async (imageData: string) => {
@@ -74,162 +73,6 @@ const Index = () => {
     });
   };
 
-  const handleLinkedInSearch = async () => {
-    if (cards.length === 0) {
-      toast({
-        title: "No cards to search",
-        description: "Please scan some business cards first",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLinkedInSearching(true);
-    toast({
-      title: "LinkedIn Search",
-      description: "Searching for LinkedIn profiles...",
-    });
-
-    try {
-      // Create a copy of cards with LinkedIn profile URLs
-      const updatedCards = [...cards];
-      
-      // Process each card to find LinkedIn profiles
-      let foundCount = 0;
-      for (let i = 0; i < updatedCards.length; i++) {
-        const card = updatedCards[i];
-        if (card.email) {
-          try {
-            // Search for LinkedIn profile using email, name, and company
-            const linkedinUrl = await searchLinkedInProfile(card.email, card.name, card.company);
-            if (linkedinUrl) {
-              updatedCards[i] = { ...card, linkedinUrl };
-              foundCount++;
-            }
-          } catch (error) {
-            console.warn(`Failed to find LinkedIn profile for ${card.email}:`, error);
-          }
-        }
-        
-        // Add a small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
-      setCards(updatedCards);
-      
-      toast({
-        title: "LinkedIn Search Complete",
-        description: `Found ${foundCount} LinkedIn profiles`,
-      });
-    } catch (error) {
-      console.error("LinkedIn search error:", error);
-      toast({
-        title: "Search Failed",
-        description: "Failed to search for LinkedIn profiles. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLinkedInSearching(false);
-    }
-  };
-
-// This function is no longer needed as we're updating cards directly in the search function
-  // const handleUpdateCardWithLinkedIn = (id: string, linkedinUrl: string) => {
-  //   setCards((prev) =>
-  //     prev.map((card) => (card.id === id ? { ...card, linkedinUrl } : card))
-  //   );
-  // };
-
-
-  const searchLinkedInProfile = async (email: string, name?: string, company?: string): Promise<string | null> => {
-    // In a real application, you would use LinkedIn's API or a third-party service
-    // This is a simplified implementation that generates realistic LinkedIn URLs
-    
-    // Predefined list of realistic LinkedIn profile URLs with associated data for demonstration
-    // In a real implementation, these would come from an actual API search
-    const realisticProfiles = [
-      { url: 'https://www.linkedin.com/in/john-doe-123456', name: 'John Doe', email: 'john.doe@example.com', company: 'Tech Solutions Inc' },
-      { url: 'https://www.linkedin.com/in/jane-smith-abcdef', name: 'Jane Smith', email: 'jane.smith@corporate.com', company: 'Global Enterprises' },
-      { url: 'https://www.linkedin.com/in/michael-brown-789012', name: 'Michael Brown', email: 'm.brown@innovate.com', company: 'Innovate Corp' },
-      { url: 'https://www.linkedin.com/in/sarah-johnson-345678', name: 'Sarah Johnson', email: 's.johnson@digital.com', company: 'Digital Services' },
-      { url: 'https://www.linkedin.com/in/david-wilson-901234', name: 'David Wilson', email: 'd.wilson@tech.com', company: 'Tech Industries' },
-      { url: 'https://www.linkedin.com/in/emily-davis-567890', name: 'Emily Davis', email: 'e.davis@creative.com', company: 'Creative Agency' },
-      { url: 'https://www.linkedin.com/in/robert-miller-234567', name: 'Robert Miller', email: 'r.miller@consulting.com', company: 'Consulting Group' },
-      { url: 'https://www.linkedin.com/in/jennifer-garcia-890123', name: 'Jennifer Garcia', email: 'j.garcia@marketing.com', company: 'Marketing Solutions' },
-      { url: 'https://www.linkedin.com/in/william-rodriguez-456789', name: 'William Rodriguez', email: 'w.rodriguez@finance.com', company: 'Finance Partners' },
-      { url: 'https://www.linkedin.com/in/jessica-martinez-123789', name: 'Jessica Martinez', email: 'j.martinez@health.com', company: 'Health Systems' }
-    ];
-    
-    // Helper function to normalize text for comparison
-    const normalizeText = (text: string): string => {
-      return text.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
-    };
-    
-    // Helper function to check if two names match
-    const namesMatch = (name1: string, name2: string): boolean => {
-      const norm1 = normalizeText(name1);
-      const norm2 = normalizeText(name2);
-      
-      // Check for exact match or first name match
-      return norm1 === norm2 || norm1.split(' ')[0] === norm2.split(' ')[0];
-    };
-    
-    // Helper function to check if two companies match
-    const companiesMatch = (company1: string, company2: string): boolean => {
-      const norm1 = normalizeText(company1);
-      const norm2 = normalizeText(company2);
-      
-      // Check for exact match or if one contains the other
-      return norm1 === norm2 || norm1.includes(norm2) || norm2.includes(norm1);
-    };
-    
-    // Helper function to check if two emails match
-    const emailsMatch = (email1: string, email2: string): boolean => {
-      // Compare email prefixes (before @)
-      const prefix1 = email1.split('@')[0]?.toLowerCase();
-      const prefix2 = email2.split('@')[0]?.toLowerCase();
-      
-      return prefix1 === prefix2;
-    };
-    
-    // Helper function to find an exact matching profile
-    const findExactMatchingProfile = (email: string, name?: string, company?: string): string | null => {
-      // All three criteria must be provided
-      if (!email || !name || !company) {
-        return null;
-      }
-      
-      // Search for a profile that matches all three criteria
-      for (const profile of realisticProfiles) {
-        if (
-          emailsMatch(email, profile.email) &&
-          namesMatch(name, profile.name) &&
-          companiesMatch(company, profile.company)
-        ) {
-          return profile.url;
-        }
-      }
-      
-      // No exact match found
-      return null;
-    };
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Find an exact matching profile
-    const profileUrl = findExactMatchingProfile(email, name, company);
-    
-    return profileUrl;
-  };
-
-
-  // Update the CardData interface to include LinkedIn URL
-  const updateCardDataWithLinkedIn = (id: string, linkedinUrl: string) => {
-    setCards((prev) =>
-      prev.map((card) => (card.id === id ? { ...card, linkedinUrl } : card))
-    );
-  };
 
 
   return (
@@ -307,20 +150,7 @@ const Index = () => {
             {/* Right Side - Report/Results */}
             <div className="py-4 md:col-span-2">
               <div className="bg-gradient-to-br from-card to-muted rounded-2xl shadow-xl p-6 border border-border h-full">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                  <h2 className="text-2xl font-bold text-foreground">Scanned Cards Report</h2>
-                  <button 
-                    onClick={handleLinkedInSearch}
-                    disabled={isLinkedInSearching}
-                    className={`px-3 py-2 rounded-lg transition-colors text-sm flex items-center gap-1 ${isLinkedInSearching ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
-                    </svg>
-                    <span className="hidden sm:inline">{isLinkedInSearching ? 'Searching...' : 'Search LinkedIn'}</span>
-                    <span className="sm:hidden">{isLinkedInSearching ? 'Searching...' : 'LinkedIn'}</span>
-                  </button>
-                </div>
+                <h2 className="text-2xl font-bold text-foreground">Scanned Cards Report</h2>
                 
                 {isProcessing && (
                   <div className="flex items-center justify-center py-12">
