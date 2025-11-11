@@ -92,6 +92,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
       // Stop any existing stream
       if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
+        setCameraStream(null);
       }
 
       // Request camera access with constraints for better performance
@@ -108,12 +109,25 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
       
       // Attach stream to video element
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+        // Wait a moment for the video element to be ready
+        setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            // Play the video to ensure it's active
+            videoRef.current.play().catch(err => console.warn('Video play failed:', err));
+          }
+        }, 100);
       }
     } catch (error) {
       console.warn('Camera access failed, falling back to file input:', error);
       // Try user-facing camera as fallback
       try {
+        // Stop any existing stream first
+        if (cameraStream) {
+          cameraStream.getTracks().forEach(track => track.stop());
+          setCameraStream(null);
+        }
+        
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { 
             facingMode: 'user',
@@ -126,9 +140,17 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
         setShowCamera(true);
         
         if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+          // Wait a moment for the video element to be ready
+          setTimeout(() => {
+            if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+              // Play the video to ensure it's active
+              videoRef.current.play().catch(err => console.warn('Video play failed:', err));
+            }
+          }, 100);
         }
       } catch (fallbackError) {
+        console.warn('User-facing camera also failed:', fallbackError);
         // Final fallback to file input method
         fallbackToInputMethod();
       }
@@ -169,7 +191,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
   };
 
   const capturePhoto = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
+    if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
       const video = videoRef.current;
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
@@ -177,8 +199,15 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
       
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        // Draw a black background first to ensure proper capture
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw the video frame
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageData = canvas.toDataURL('image/jpeg');
+        
+        // Convert to JPEG with good quality
+        const imageData = canvas.toDataURL('image/jpeg', 0.8);
         setPreview(imageData);
         onImageCapture(imageData);
         
@@ -189,6 +218,12 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
         }
         setShowCamera(false);
       }
+    } else {
+      toast({
+        title: "Camera not ready",
+        description: "Please wait for the camera to initialize and try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -240,29 +275,28 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
         </div>
 
         {showCamera && (
-          <div className="relative mt-4 rounded-lg overflow-hidden shadow-medium">
+          <div className="mt-4 rounded-lg overflow-hidden shadow-medium">
             <video
               ref={videoRef}
               autoPlay
               playsInline
               className="w-full h-auto max-h-96 object-contain bg-muted"
             />
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex gap-2 mt-2">
               <Button
                 onClick={capturePhoto}
-                className="bg-primary text-primary-foreground shadow-lg"
+                className="flex-1 bg-primary text-primary-foreground shadow-lg"
               >
                 Capture Photo
               </Button>
+              <Button
+                onClick={clearImage}
+                variant="destructive"
+                className="flex-1 shadow-medium"
+              >
+                Cancel
+              </Button>
             </div>
-            <Button
-              onClick={clearImage}
-              size="icon"
-              variant="destructive"
-              className="absolute top-2 right-2 shadow-medium"
-            >
-              <X className="h-4 w-4" />
-            </Button>
           </div>
         )}
         
