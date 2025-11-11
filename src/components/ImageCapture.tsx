@@ -82,35 +82,78 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
 
   const startCamera = async () => {
     try {
+      // Stop any existing stream
       if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
         setCameraStream(null);
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" }, // iOS fix
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+      // Try environment camera first
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        });
+      } catch (envError) {
+        console.warn('Environment camera failed:', envError);
+        // Fallback to user-facing camera
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: "user" },
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          });
+        } catch (userError) {
+          console.warn('User camera failed:', userError);
+          // Final fallback to file input
+          fallbackToInputMethod();
+          return;
         }
-      });
+      }
 
       setCameraStream(stream);
       setShowCamera(true);
 
+      // Attach stream to video element
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.setAttribute("playsinline", ""); // iOS fix
-
-        await videoRef.current.play().catch(err => {
-          console.log("Video play failed:", err);
-        });
+        
+        // Add event listeners for better control
+        videoRef.current.onloadedmetadata = () => {
+          console.log('Video metadata loaded');
+          // Play video once metadata is loaded
+          if (videoRef.current) {
+            videoRef.current.play().catch(playError => {
+              console.warn('Video play failed:', playError);
+              toast({
+                title: "Camera Warning",
+                description: "Camera loaded but playback failed. You can still capture photos.",
+              });
+            });
+          }
+        };
+        
+        videoRef.current.onerror = (videoError) => {
+          console.error('Video element error:', videoError);
+          toast({
+            title: "Camera Error",
+            description: "Video display error. Please try again.",
+            variant: "destructive",
+          });
+        };
       }
     } catch (error: any) {
-      console.log("Camera Error:", error.name, error.message);
+      console.error("Camera Error:", error);
       toast({
-        title: "Camera Error",
-        description: error.message || "Unable to access camera",
+        title: "Camera Access Failed",
+        description: "Unable to access camera. Please check permissions and try again.",
         variant: "destructive",
       });
       setShowCamera(false);
@@ -126,22 +169,26 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
       const cameraInput = cameraInputRef.current;
       cameraInput.setAttribute("capture", "environment");
       
-      // Click the input directly
-      try {
-        cameraInput.click();
-      } catch (error) {
-        console.warn('Environment camera failed, trying user camera:', error);
-        // Fallback to user-facing camera
-        try {
-          cameraInput.setAttribute("capture", "user");
-          cameraInput.click();
-        } catch (userError) {
-          console.warn('User camera failed, opening file dialog:', userError);
-          // Final fallback: open file dialog without capture attribute
-          cameraInput.removeAttribute("capture");
-          cameraInput.click();
+      // Click the input directly with a small delay to ensure DOM is ready
+      setTimeout(() => {
+        if (cameraInputRef.current) {
+          try {
+            cameraInputRef.current.click();
+          } catch (error) {
+            console.warn('Environment camera failed, trying user camera:', error);
+            // Fallback to user-facing camera
+            try {
+              cameraInputRef.current.setAttribute("capture", "user");
+              cameraInputRef.current.click();
+            } catch (userError) {
+              console.warn('User camera failed, opening file dialog:', userError);
+              // Final fallback: open file dialog without capture attribute
+              cameraInputRef.current.removeAttribute("capture");
+              cameraInputRef.current.click();
+            }
+          }
         }
-      }
+      }, 100);
     }
   };
 
@@ -149,8 +196,8 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
     if (videoRef.current) {
       const video = videoRef.current;
       
-      // Check if video is actually playing and has data
-      if (video.readyState < video.HAVE_METADATA) {
+      // Check if video has data, even if not fully playing
+      if (video.readyState < video.HAVE_METADATA && !video.srcObject) {
         toast({
           title: "Camera not ready",
           description: "Please wait for the camera to initialize and try again.",
@@ -159,10 +206,14 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
         return;
       }
       
+      // Use video dimensions or fallback to standard size
+      const width = video.videoWidth || 1280;
+      const height = video.videoHeight || 720;
+      
       // Create canvas with actual video dimensions
       const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width = width;
+      canvas.height = height;
       
       const ctx = canvas.getContext('2d');
       if (ctx) {
@@ -171,7 +222,12 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         // Draw the video frame
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        try {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        } catch (drawError) {
+          console.warn('Draw error, using black frame:', drawError);
+          // If draw fails, at least we have the black background
+        }
         
         // Convert to JPEG with good quality
         const imageData = canvas.toDataURL('image/jpeg', 0.8);

@@ -94,15 +94,6 @@ const Index = () => {
               Digitize business cards instantly with powerful OCR technology. Capture, extract, and manage contact information effortlessly.
             </p>
             
-            <div className="max-w-2xl mx-auto mt-6">
-              <div className="flex items-start">
-                <span className="mr-2">⚠️</span>
-                <p className="text-sm">
-                  <strong>Disclaimer:</strong> This app can throw up any error, so please cross verify the details.
-                </p>
-              </div>
-            </div>
-            
             <div className="pt-8">
               <button
                 onClick={() => setShowApp(true)}
