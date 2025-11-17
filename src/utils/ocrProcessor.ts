@@ -1,5 +1,48 @@
 import { createWorker, PSM } from 'tesseract.js';
 
+// Helper function to convert HEIC to JPEG
+const convertHeicToJpeg = (imageData: string): Promise<string> => {
+  return new Promise((resolve) => {
+    // If it's not HEIC, return as is
+    if (!imageData.startsWith('data:image/heic')) {
+      resolve(imageData);
+      return;
+    }
+
+    // For HEIC images, we need to convert them to JPEG
+    // Since HEIC conversion is complex, we'll use a canvas-based approach
+    // This will work for most cases where the browser can decode HEIC
+    const img = new Image();
+    img.onload = () => {
+      // Create canvas for conversion
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        resolve(imageData); // Return original if context not available
+        return;
+      }
+      
+      // Set canvas dimensions to match image
+      canvas.width = img.width;
+      canvas.height = img.height;
+      
+      // Draw image on canvas
+      ctx.drawImage(img, 0, 0);
+      
+      // Convert to JPEG
+      const jpegData = canvas.toDataURL('image/jpeg', 0.85);
+      resolve(jpegData);
+    };
+    img.onerror = () => {
+      // If HEIC conversion fails, return original
+      console.warn('Failed to convert HEIC to JPEG, using original data');
+      resolve(imageData);
+    };
+    img.src = imageData;
+  });
+};
+
 // Helper function to convert data URL to Blob
 const dataURLToBlob = (dataURL: string): Blob => {
   const parts = dataURL.split(';base64,');
@@ -13,30 +56,6 @@ const dataURLToBlob = (dataURL: string): Blob => {
   }
 
   return new Blob([uInt8Array], { type: contentType });
-};
-
-// Helper function to convert data URL to ImageData (Canvas ImageData)
-const dataURLToImageData = (dataURL: string): Promise<ImageData> => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Could not get canvas context'));
-        return;
-      }
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      resolve(imageData);
-    };
-    img.onerror = (error) => {
-      reject(new Error(`Failed to load image: ${error}`));
-    };
-    img.src = dataURL;
-  });
 };
 
 // Helper function to resize image for better OCR performance
@@ -128,13 +147,22 @@ export const processImage = async (imageData: string): Promise<CardData> => {
   const isCrossOriginIsolated = window.crossOriginIsolated;
   console.log('Cross-origin isolation status:', isCrossOriginIsolated);
   
-  // First, resize the image for better OCR performance
-  let resizedImageData: string = imageData;
+  // First, convert HEIC to JPEG if needed
+  let jpegImageData: string = imageData;
   try {
-    resizedImageData = await resizeImageForOCR(imageData);
+    jpegImageData = await convertHeicToJpeg(imageData);
+  } catch (heicError) {
+    console.warn('HEIC conversion failed, using original image', heicError);
+    jpegImageData = imageData;
+  }
+  
+  // Then, resize the image for better OCR performance
+  let resizedImageData: string = jpegImageData;
+  try {
+    resizedImageData = await resizeImageForOCR(jpegImageData);
   } catch (resizeError) {
     console.warn('Image resize failed, using original image', resizeError);
-    resizedImageData = imageData;
+    resizedImageData = jpegImageData;
   }
   
   // Prepare image for OCR using the most compatible format
