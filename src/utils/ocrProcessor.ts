@@ -358,7 +358,7 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   let designation = '';
   let name = '';
   let company = '';
-  let address = '';
+  let address = ''; // Initialize address here
   
   // Extract email username for validation (part before @)
   let emailUsername = '';
@@ -367,7 +367,7 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   }
   
   // NEW RULE IMPLEMENTATION:
-  // 1. Check email address for name
+  // 1. Check email address for name (emailUsername)
   // 2. Look in the entire card to search for the name
   // 3. Put correct name in column after this validation
   if (emailUsername) {
@@ -552,7 +552,6 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   // Implement the specific rules you provided
   // Characteristics: Longest multi-line block containing words + digits + commas
   // Must contain address indicators (Road, Street, Lane, Floor, City, ZIP)
-  address = '';
   
   // Address indicators as specified
   const addressKeywords = [
@@ -653,12 +652,13 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     }
   }
   
-  // Set the address if we found a good candidate
-  // ONLY set address if we found a valid one, otherwise leave blank
+  // Set the address ONLY if we found a valid candidate
+  // If no valid address found, address remains empty string as initialized
   if (bestAddressCandidate) {
     address = bestAddressCandidate;
   }
-  
+  // If no valid address found, address remains empty string (blank)
+
   // Remove ALL junk characters from all fields EXCEPT email and website
   const cleanText = (text: string): string => {
     if (!text) return '';
@@ -672,7 +672,7 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   const cleanWebsite = (text: string): string => {
     if (!text) return '';
     return text
-      .replace(/[!*~"'/\-\\(),?;:#^&[\]{}|<>`=+_]/g, '') // Remove junk characters but keep dots and @
+      .replace(/[!*~"'/\-\\(),?;:#^&[\]{}|<>`=+_\$]/g, '') // Remove junk characters but keep dots and @
       .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
   };
