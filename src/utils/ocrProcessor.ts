@@ -333,16 +333,18 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   // FIXED RULES IMPLEMENTATION:
   
   // NAME EXTRACTION:
-  // 1. Largest capitalized 2-3 word line (big bold letters)
-  // 2. From email if name not clearly mentioned
-  for (let i = 0; i < Math.min(12, lines.length); i++) {
+  // 1. Prioritize visually prominent names (big, bold, all caps)
+  // 2. Look for names in the first few lines (typically where names are placed)
+  // 3. Exclude lines with numbers, emails, phones, websites, or designations
+  
+  // First, look for visually prominent names in the first 8 lines
+  for (let i = 0; i < Math.min(8, lines.length); i++) {
     const line = lines[i].trim();
-    const words = line.split(' ');
     
     // Skip if line is empty
     if (!line) continue;
     
-    // Skip if it's clearly not a name (contains numbers, emails, phones, websites)
+    // Skip if it's clearly not a name
     const hasNumbers = /\d/.test(line);
     const hasEmail = emails.some(e => line.toLowerCase().includes(e));
     const hasPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
@@ -355,41 +357,81 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
       line.toLowerCase().includes(kw.toLowerCase())
     );
     
-    if (isDesignation) {
-      // Store designation but continue looking for name
-      if (!designation) designation = line.trim();
-      continue;
-    }
+    if (isDesignation) continue;
     
-    // Look for potential names:
+    // Look for visually prominent names:
     // - All caps (common for names on business cards)
-    // - Properly capitalized (First Last)
     // - Reasonable length (1-4 words)
     const isAllCaps = line === line.toUpperCase() && line.length > 1;
-    const isProperlyCapitalized = /^[A-Z][a-z]+(\s[A-Z][a-z]+)*$/.test(line);
+    const words = line.split(' ');
     const isReasonableLength = words.length >= 1 && words.length <= 4;
     
-    if (isReasonableLength && (isAllCaps || isProperlyCapitalized)) {
-      // Additional validation: check if it looks like a real name
-      // Names typically don't have too many consecutive capital letters
+    // Additional validation for all caps names
+    if (isAllCaps && isReasonableLength) {
+      // Names typically don't have too many consecutive capital letters or special characters
       const consecutiveCaps = (line.match(/[A-Z]{3,}/g) || []).length;
+      const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(line);
       
-      if (consecutiveCaps === 0 || (consecutiveCaps === 1 && isAllCaps)) {
+      if (consecutiveCaps <= 1 && !hasSpecialChars) {
         name = line;
         break;
       }
     }
   }
   
-  // FALLBACK: Extract name from email if not found in text
+  // If no visually prominent name found, try properly capitalized names
+  if (!name) {
+    for (let i = 0; i < Math.min(8, lines.length); i++) {
+      const line = lines[i].trim();
+      
+      // Skip if line is empty
+      if (!line) continue;
+      
+      // Skip if it's clearly not a name
+      const hasNumbers = /\d/.test(line);
+      const hasEmail = emails.some(e => line.toLowerCase().includes(e));
+      const hasPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
+      const isWebsite = line.toLowerCase().includes('www.') || line.toLowerCase().includes('.com') || line.toLowerCase().includes('.org');
+      
+      if (hasNumbers || hasEmail || hasPhone || isWebsite) continue;
+      
+      // Check if it's a designation
+      const isDesignation = designationKeywords.some(kw => 
+        line.toLowerCase().includes(kw.toLowerCase())
+      );
+      
+      if (isDesignation) continue;
+      
+      // Look for properly capitalized names (First Last format)
+      const isProperlyCapitalized = /^[A-Z][a-z]+(\s[A-Z][a-z]+)*$/.test(line);
+      const words = line.split(' ');
+      const isReasonableLength = words.length >= 1 && words.length <= 4;
+      
+      if (isProperlyCapitalized && isReasonableLength) {
+        name = line;
+        break;
+      }
+    }
+  }
+  
+  // FALLBACK: Extract name from email if no name found in text
   if (!name && emails.length > 0) {
     const emailParts = emails[0].split('@');
     if (emailParts.length === 2) {
       const username = emailParts[0];
       // Convert username to proper name format (replace dots with spaces and capitalize)
-      name = username.replace(/\./g, ' ') // Replace dots with spaces
+      let extractedName = username.replace(/\./g, ' ') // Replace dots with spaces
         .replace(/\b\w/g, char => char.toUpperCase()) // Capitalize first letter of each word
         .trim();
+      
+      // Validate the extracted name (1-4 words, no numbers)
+      const words = extractedName.split(' ');
+      const hasNumbers = /\d/.test(extractedName);
+      const isReasonableLength = words.length >= 1 && words.length <= 4;
+      
+      if (isReasonableLength && !hasNumbers) {
+        name = extractedName;
+      }
     }
   }
   
