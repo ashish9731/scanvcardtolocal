@@ -229,7 +229,8 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   const emails: string[] = emailMatches ? Array.from(emailMatches).map(e => e.toLowerCase()) : [];
   
   // Enhanced phone regex - supports various formats including country codes
-  const phoneRegex = /(\+?\d{1,4}[\s-]?)?\(?\d{1,4}\)?[\s-]?\d{1,4}[\s-]?\d{1,4}[\s-]?\d{1,9}/g;
+  // More comprehensive regex to capture different phone number formats
+  const phoneRegex = /(\+?\d{1,4}[-.\s]?)?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/g;
   const phoneMatches = normalizedText.match(phoneRegex);
   const phones: string[] = phoneMatches ? Array.from(new Set(phoneMatches.map(p => p.trim()))) : [];
   
@@ -273,12 +274,55 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     return { companyFromEmail: '', websiteFromEmail: '' };
   })();
   
-  // Common designation keywords
+  // Comprehensive designation keywords
   const designationKeywords: string[] = [
-    'CEO', 'CTO', 'CFO', 'COO', 'Manager', 'Director', 'President', 
-    'Vice President', 'VP', 'Engineer', 'Developer', 'Designer', 
-    'Consultant', 'Analyst', 'Specialist', 'Coordinator', 'Executive',
-    'Founder', 'Partner', 'Head', 'Lead', 'Senior', 'Junior'
+    'Chairman', 'Chairperson', 'CEO', 'Chief Executive Officer', 'President', 
+    'COO', 'Chief Operating Officer', 'CFO', 'Chief Financial Officer',
+    'CIO', 'Chief Information Officer', 'CTO', 'Chief Technology Officer',
+    'CMO', 'Chief Marketing Officer', 'CHRO', 'Chief Human Resources Officer',
+    'CSO', 'Chief Strategy Officer', 'CPO', 'Chief Product Officer',
+    'CLO', 'Chief Legal Officer', 'CAO', 'Chief Administrative Officer',
+    'Vice President', 'VP', 'Director', 'Senior Manager', 'Manager',
+    'Assistant Manager', 'Team Lead', 'Supervisor', 'Executive', 'Associate',
+    'Coordinator', 'Assistant', 'Intern', 'Trainee', 'Software Engineer',
+    'Senior Software Engineer', 'Lead Developer', 'Principal Engineer',
+    'Solutions Architect', 'Cloud Architect', 'DevOps Engineer',
+    'Data Engineer', 'ML Engineer', 'AI Engineer', 'Data Analyst',
+    'Business Analyst', 'Data Scientist', 'AI Researcher', 'BI Developer',
+    'Product Manager', 'Product Owner', 'Program Manager', 'Scrum Master',
+    'Project Manager', 'IT Support Engineer', 'Systems Administrator',
+    'Network Engineer', 'Cybersecurity Analyst', 'Security Architect',
+    'Plant Manager', 'Production Manager', 'Quality Control Officer',
+    'QA/QC Engineer', 'Maintenance Engineer', 'Manufacturing Engineer',
+    'Machine Operator', 'Line Supervisor', 'Process Engineer',
+    'Investment Banker', 'Financial Analyst', 'Portfolio Manager',
+    'Loan Officer', 'Branch Manager', 'Relationship Manager',
+    'Actuary', 'Underwriter', 'Claims Officer', 'Auditor', 'Tax Consultant',
+    'Sales Executive', 'Sales Manager', 'Business Development Manager',
+    'Key Account Manager', 'Area Sales Manager', 'Regional Sales Manager',
+    'Marketing Executive', 'Digital Marketing Specialist', 'SEO Specialist',
+    'Brand Manager', 'Content Strategist', 'HR Manager', 'HR Business Partner',
+    'Talent Acquisition Specialist', 'Recruitment Manager', 'HR Generalist',
+    'Employee Relations Manager', 'Training & Development Manager',
+    'Compensation & Benefits Analyst', 'Teacher', 'Lecturer', 'Professor',
+    'Academic Coordinator', 'Principal', 'Dean', 'Trainer',
+    'Instructional Designer', 'Research Scholar', 'Store Manager',
+    'Retail Associate', 'Cashier', 'Sales Advisor', 'Hotel Manager',
+    'Front Desk Executive', 'Chef', 'Housekeeping Supervisor',
+    'Travel Consultant', 'Tour Guide', 'Supply Chain Manager',
+    'Logistics Coordinator', 'Warehouse Manager', 'Inventory Analyst',
+    'Procurement Manager', 'Fleet Manager', 'Transport Supervisor',
+    'Dispatcher', 'Civil Engineer', 'Site Engineer', 'Project Engineer',
+    'Architect', 'Interior Designer', 'Safety Officer',
+    'Construction Supervisor', 'Structural Engineer', 'Graphic Designer',
+    'UI/UX Designer', 'Video Editor', 'Animator', 'Creative Director',
+    'Copywriter', 'Journalist', 'Photographer', 'Social Media Manager',
+    'Petroleum Engineer', 'Drilling Engineer', 'Geologist',
+    'Refinery Operator', 'HSE Officer', 'Pipeline Engineer',
+    'Field Technician', 'Officer', 'Inspector', 'Superintendent',
+    'Director-General', 'Commissioner', 'Specialist', 'Analyst',
+    'Clerk', 'Assistant', 'Lawyer', 'Attorney', 'Legal Advisor',
+    'Corporate Counsel', 'Paralegal', 'Legal Associate', 'Compliance Officer'
   ];
   
   let designation = '';
@@ -353,6 +397,7 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   // Line containing title keywords, adjacent to name
   for (const line of lines) {
     for (const keyword of designationKeywords) {
+      // Check for exact matches or partial matches
       if (line.toLowerCase().includes(keyword.toLowerCase())) {
         designation = line.trim();
         break;
@@ -381,6 +426,29 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
       // Phone numbers typically 7-15 digits
       return digitsOnly.length >= 7 && digitsOnly.length <= 15 && /\d/.test(digitsOnly);
     });
+  }
+  
+  // If no clean phones found, try a more aggressive search for phone-like patterns
+  if (cleanPhones.length === 0) {
+    // Look for phone patterns in individual lines
+    for (const line of lines) {
+      // Look for patterns like +91 9876543210, (123) 456-7890, etc.
+      const potentialPhones = line.match(/[\+]?[\d\s\-\(\)]{7,20}/g);
+      if (potentialPhones) {
+        for (const phone of potentialPhones) {
+          // Clean the phone number
+          let cleanPhone = phone.replace(/[^+\d]/g, '');
+          if (cleanPhone.startsWith('+')) {
+            cleanPhone = '+' + cleanPhone.substring(1);
+          }
+          // Validate the cleaned phone
+          const digitsOnly = cleanPhone.replace(/\+/g, '');
+          if (digitsOnly.length >= 7 && digitsOnly.length <= 15 && /\d/.test(digitsOnly)) {
+            cleanPhones.push(cleanPhone);
+          }
+        }
+      }
+    }
   }
   
   // COMPANY EXTRACTION:
