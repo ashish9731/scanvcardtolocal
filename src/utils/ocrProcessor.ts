@@ -228,13 +228,13 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   const emailMatches = normalizedText.match(emailRegex);
   const emails: string[] = emailMatches ? Array.from(emailMatches).map(e => e.toLowerCase()) : [];
   
-  // Enhanced phone regex - supports Indian format
+  // Enhanced phone regex - supports various formats
   const phoneRegex = /(\+?\d{1,4}[\s-]?)?\(?\d{2,5}\)?[\s-]?\d{3,5}[\s-]?\d{4,5}/g;
   const phoneMatches = normalizedText.match(phoneRegex);
   const phones: string[] = phoneMatches ? Array.from(new Set(phoneMatches.map(p => p.trim()))) : [];
   
-  // Website regex - find www. patterns
-  const websiteRegex = /(www\.[\w-]+\.[\w.-]+)/gi;
+  // Website regex - find www. patterns or domains with suffixes
+  const websiteRegex = /((https?:\/\/)?(www\.)?[\w-]+\.[\w.-]+)/gi;
   const websiteMatches = normalizedText.match(websiteRegex);
   const websiteFromText = websiteMatches ? websiteMatches[0].toLowerCase() : '';
   
@@ -243,7 +243,7 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     if (websiteFromText) {
       try {
         // Extract domain name from website (e.g., www.abc.com -> abc)
-        const domainMatch = websiteFromText.match(/www\.([\w-]+)\./i);
+        const domainMatch = websiteFromText.match(/(?:www\.)?([\w-]+)\./i);
         if (domainMatch && domainMatch[1]) {
           return domainMatch[1].charAt(0).toUpperCase() + domainMatch[1].slice(1);
         }
@@ -286,49 +286,44 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   let company = '';
   let address = '';
   
-  // Find designation
-  for (const line of lines) {
-    for (const keyword of designationKeywords) {
-      if (line.toLowerCase().includes(keyword.toLowerCase())) {
-        designation = line.trim();
-        break;
-      }
-    }
-    if (designation) break;
-  }
+  // FIXED RULES IMPLEMENTATION:
   
-  // Enhanced name detection - more flexible approach
-  for (let i = 0; i < Math.min(8, lines.length); i++) {
+  // NAME EXTRACTION:
+  // 1. Largest capitalized 2-3 word line
+  // 2. From email if name not clearly mentioned
+  for (let i = 0; i < Math.min(10, lines.length); i++) {
     const line = lines[i].trim();
     const words = line.split(' ');
     
     // Skip if line is empty
     if (!line) continue;
     
-    // Skip if it's clearly not a name
-    const isTooLong = line.length > 50;
+    // Skip if it's clearly not a name (contains numbers, emails, phones, websites)
     const hasNumbers = /\d/.test(line);
     const hasEmail = emails.some(e => line.toLowerCase().includes(e));
     const hasPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
     const isWebsite = line.toLowerCase().includes('www.') || line.toLowerCase().includes('.com') || line.toLowerCase().includes('.org');
     
-    if (isTooLong || hasNumbers || hasEmail || hasPhone || isWebsite) continue;
+    if (hasNumbers || hasEmail || hasPhone || isWebsite) continue;
     
     // Check if it's a designation
     const isDesignation = designationKeywords.some(kw => 
       line.toLowerCase().includes(kw.toLowerCase())
     );
     
-    if (isDesignation) continue;
+    if (isDesignation) {
+      // Store designation but continue looking for name
+      if (!designation) designation = line.trim();
+      continue;
+    }
     
     // Look for potential names:
-    // 1. All caps (common for names on business cards)
-    // 2. Properly capitalized (First Last)
-    // 3. Reasonable length (2-4 words)
-    
+    // - All caps (common for names on business cards)
+    // - Properly capitalized (First Last)
+    // - Reasonable length (2-3 words)
     const isAllCaps = line === line.toUpperCase() && line.length > 2;
     const isProperlyCapitalized = /^[A-Z][a-z]+(\s[A-Z][a-z]+)*$/.test(line);
-    const isReasonableLength = words.length >= 1 && words.length <= 4;
+    const isReasonableLength = words.length >= 1 && words.length <= 3;
     
     if (isReasonableLength && (isAllCaps || isProperlyCapitalized)) {
       // Additional validation: check if it looks like a real name
@@ -340,187 +335,112 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
         break;
       }
     }
-    
-    // Fallback: if we haven't found a name yet and this line looks plausible
-    if (!name && words.length >= 2 && words.length <= 3 && /^[A-Z]/.test(line)) {
-      // Check that it doesn't contain obvious non-name words
-      const nonNameIndicators = ['inc', 'llc', 'ltd', 'corp', 'company', 'group', 'solutions'];
-      const containsNonName = nonNameIndicators.some(indicator => 
-        line.toLowerCase().includes(indicator)
-      );
-      
-      if (!containsNonName) {
-        name = line;
-      }
-    }
   }
   
-  // Final fallback: if no name found, try to extract from email address
+  // FALLBACK: Extract name from email if not found in text
   if (!name && emails.length > 0) {
-    // Extract username from email (part before @)
     const emailParts = emails[0].split('@');
     if (emailParts.length === 2) {
       const username = emailParts[0];
       // Convert username to proper name format (replace dots with spaces and capitalize)
-      let extractedName = username.replace(/\./g, ' ') // Replace dots with spaces
+      name = username.replace(/\./g, ' ') // Replace dots with spaces
         .replace(/\b\w/g, char => char.toUpperCase()) // Capitalize first letter of each word
         .trim();
-      
-      // Only use if it looks like a reasonable name (2-3 words, no numbers)
-      const words = extractedName.split(' ');
-      if (words.length >= 1 && words.length <= 3 && !/\d/.test(extractedName)) {
-        name = extractedName;
-      }
     }
   }
   
-  // Last resort: try to find any capitalized line that might be a name
-  if (!name) {
-    for (let i = 0; i < Math.min(6, lines.length); i++) {
-      const line = lines[i].trim();
-      if (line && /^[A-Z][a-z]+(\s[A-Z][a-z]+)*$/.test(line) && line.length <= 30) {
-        // Check it's not a company by looking for company indicators
-        const companyIndicators = ['inc', 'llc', 'ltd', 'corp', 'company', 'group'];
-        const isLikelyCompany = companyIndicators.some(indicator => 
-          line.toLowerCase().includes(indicator)
-        );
-        
-        if (!isLikelyCompany) {
-          name = line;
-          break;
-        }
-      }
-    }
-  }
-  
-  // Find company name - prioritize logo area (first few lines) or email domain
-  // But if we have a clear website domain, prioritize that over logo text unless it's clearly a company name
-  let companyFromText = '';
-  
-  // Enhanced company name detection with better logic for logos and company names
-  // Look at the first few lines which often contain logos/company names
-  const logoAreaLines = lines.slice(0, Math.min(10, lines.length));
-  
-  // Common company suffixes that help identify company names
-  const companySuffixes = ['Inc', 'LLC', 'Ltd', 'Corp', 'Corporation', 'Company', 'Co', 'Group', 'Associates', 'Partners', 'Enterprises', 'Solutions', 'Technologies', 'Tech', 'Industries', 'Holdings', 'Ventures', 'Capital'];
-  
-  // Common words that indicate it's NOT a company name (likely a person's name)
-  const nameIndicators = ['Mr', 'Mrs', 'Ms', 'Dr', 'Prof'];
-  
-  for (let i = 0; i < logoAreaLines.length; i++) {
-    const line = logoAreaLines[i].trim();
-    const words = line.split(' ');
-    
-    // Skip if line is empty
-    if (!line) continue;
-    
-    const isAllCaps = line === line.toUpperCase() && line.length > 1;
-    const hasNumbers = /\d/.test(line);
-    const isPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
-    const isEmail = emails.some(e => line.toLowerCase().includes(e));
-    const isDesignation = designationKeywords.some(kw => line.toLowerCase().includes(kw.toLowerCase()));
-    const isName = line === name;
-    const hasCompanySuffix = companySuffixes.some(suffix => line.toLowerCase().includes(suffix.toLowerCase()));
-    const hasNameIndicator = nameIndicators.some(indicator => line.toLowerCase().includes(indicator.toLowerCase()));
-    
-    // Skip if it's clearly not a company
-    if (isName || isEmail || isPhone || isDesignation || hasNameIndicator || hasNumbers) continue;
-    
-    // Enhanced company detection logic:
-    // - All caps text in logo area (often company names/logos)
-    // - Multiple words (2-6) that don't contain numbers
-    // - Contains company suffixes
-    if (line.length > 1 && (isAllCaps || (words.length >= 2 && words.length <= 6) || hasCompanySuffix)) {
-      // Additional check: if it's all caps and short, it's likely a company/logo
-      if (isAllCaps && line.length <= 30) {
-        companyFromText = line;
-        break;
-      }
-      // If it contains company suffixes, it's likely a company
-      else if (hasCompanySuffix) {
-        companyFromText = line;
-        break;
-      }
-      // If it's multiple words and not too long, it's likely a company
-      else if (words.length >= 2 && line.length <= 50) {
-        companyFromText = line;
+  // DESIGNATION EXTRACTION:
+  // Line containing title keywords, adjacent to name
+  for (const line of lines) {
+    for (const keyword of designationKeywords) {
+      if (line.toLowerCase().includes(keyword.toLowerCase())) {
+        designation = line.trim();
         break;
       }
     }
+    if (designation) break;
   }
   
-  // If we still don't have a company name, try to find capitalized multi-word phrases
-  if (!companyFromText) {
-    for (let i = 0; i < Math.min(12, lines.length); i++) {
-      const line = lines[i].trim();
+  // PHONE EXTRACTION:
+  // Regex-based extraction of clean phone numbers
+  // Exclude numbers that are part of addresses
+  let cleanPhones: string[] = [];
+  if (phones.length > 0) {
+    // Filter out phone-like numbers that might be part of addresses
+    cleanPhones = phones.filter(phone => {
+      // Remove spaces and dashes for length checking
+      const cleanPhone = phone.replace(/[\s-]/g, '');
+      // Phone numbers typically 7-15 digits
+      return cleanPhone.length >= 7 && cleanPhone.length <= 15 && /\d/.test(cleanPhone);
+    });
+  }
+  
+  // COMPANY EXTRACTION:
+  // Contains business suffix OR bold/large text near top
+  // From email after @ and before .com/.co/.in
+  company = companyFromEmail || companyFromWebsite;
+  
+  // If still no company, look for company indicators in text
+  if (!company) {
+    const logoAreaLines = lines.slice(0, Math.min(8, lines.length));
+    const companySuffixes = ['Inc', 'LLC', 'Ltd', 'Corp', 'Corporation', 'Company', 'Co', 'Group', 'Associates', 'Partners', 'Enterprises', 'Solutions', 'Technologies', 'Tech', 'Industries', 'Holdings', 'Ventures', 'Capital'];
+    
+    for (let i = 0; i < logoAreaLines.length; i++) {
+      const line = logoAreaLines[i].trim();
       const words = line.split(' ');
       
-      // Look for multi-word capitalized phrases that might be company names
-      if (words.length >= 2 && words.length <= 6 && /^[A-Z][a-z]/.test(words[0]) && !/\d/.test(line)) {
-        const isDesignation = designationKeywords.some(kw => line.toLowerCase().includes(kw.toLowerCase()));
-        if (!isDesignation) {
-          companyFromText = line;
-          break;
-        }
+      // Skip if line is empty
+      if (!line) continue;
+      
+      const isAllCaps = line === line.toUpperCase() && line.length > 1;
+      const hasNumbers = /\d/.test(line);
+      const isPhone = cleanPhones.some(p => line.includes(p.replace(/[\s-]/g, '')));
+      const isEmail = emails.some(e => line.toLowerCase().includes(e));
+      const hasCompanySuffix = companySuffixes.some(suffix => line.toLowerCase().includes(suffix.toLowerCase()));
+      
+      // Skip if it's clearly not a company
+      if (isPhone || isEmail || hasNumbers) continue;
+      
+      // Enhanced company detection logic:
+      if (line.length > 1 && (isAllCaps || (words.length >= 2 && words.length <= 6) || hasCompanySuffix)) {
+        company = line;
+        break;
       }
     }
   }
   
-  // Prioritize: email domain > website domain > text from logo area
-  // Email domain should be the primary source for company name
-  company = companyFromEmail || companyFromWebsite || companyFromText;
+  // WEBSITE EXTRACTION:
+  // Must contain domain suffix (.com, .in, .net, .ai etc.)
+  const finalWebsite = websiteFromEmail || websiteFromText;
   
-  // Address: longer lines at the end, or lines with keywords
-  // But exclude lines that contain email addresses or phone numbers
-  const addressKeywords: string[] = ['street', 'road', 'avenue', 'ave', 'blvd', 'suite', 'floor', 'building', 'block', 'sector', 'area'];
+  // ADDRESS EXTRACTION:
+  // Longest multi-line block containing words + digits + commas
+  // Must contain address indicators (Road, Street, Lane, Floor, City, ZIP)
+  const addressKeywords: string[] = ['street', 'st', 'road', 'rd', 'avenue', 'ave', 'blvd', 'boulevard', 'suite', 'floor', 'building', 'block', 'sector', 'area', 'city', 'zip', 'pin', 'code', 'lane', 'ln', 'drive', 'dr', 'court', 'ct', 'place', 'pl', 'apartment', 'apt'];
+  
+  // Look for address-like content from bottom up (addresses often at bottom)
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i].trim();
     
     // Skip if line contains email or phone
     const hasEmail = emails.some(e => line.toLowerCase().includes(e.toLowerCase()));
-    const hasPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
+    const hasPhone = cleanPhones.some(p => line.includes(p.replace(/[\s-]/g, '')));
     
     if (hasEmail || hasPhone) continue;
     
     // Look for address-like content
-    if ((line.length > 20 && line.length < 100) || addressKeywords.some((kw: string) => line.toLowerCase().includes(kw))) {
-      // Additional validation: address should contain numbers and/or address keywords
-      const hasNumbers = /\d/.test(line);
+    if (line.length > 15) { // Addresses are typically longer
       const hasAddressKeyword = addressKeywords.some((kw: string) => line.toLowerCase().includes(kw));
+      const hasNumbers = /\d/.test(line);
+      const hasCommas = line.includes(',');
       
-      // Only set as address if it has numbers or address keywords
-      if (hasNumbers || hasAddressKeyword) {
-        address = line;
-        break;
-      }
-    }
-  }
-  
-  // Ensure name is always extracted from email if not found in text
-  let finalName = name || '';
-  if (!finalName && emails.length > 0) {
-    // Extract username from email (part before @)
-    const emailParts = emails[0].split('@');
-    if (emailParts.length === 2) {
-      const username = emailParts[0];
-      // Convert username to proper name format (replace dots with spaces and capitalize)
-      finalName = username.replace(/\./g, ' ') // Replace dots with spaces
-        .replace(/\b\w/g, char => char.toUpperCase()) // Capitalize first letter of each word
-        .trim();
-    }
-  }
-  
-  // Ensure company name is always extracted from email domain if not found in text
-  let finalCompany = company || '';
-  if (!finalCompany && emails.length > 0) {
-    // Extract domain from email (part after @)
-    const emailParts = emails[0].split('@');
-    if (emailParts.length === 2) {
-      const domain = emailParts[1];
-      // Extract company name from domain (remove .com, .org, etc.)
-      const domainParts = domain.split('.');
-      if (domainParts.length >= 2) {
-        finalCompany = domainParts[0].charAt(0).toUpperCase() + domainParts[0].slice(1);
+      // Must have numbers and either address keywords or commas
+      if (hasNumbers && (hasAddressKeyword || hasCommas)) {
+        // Additional validation: should not contain email patterns
+        if (!line.includes('@') && !line.includes('www')) {
+          address = line;
+          break;
+        }
       }
     }
   }
@@ -528,13 +448,16 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   // Ensure email is always populated if we have one
   const finalEmail = emails[0] || '';
   
+  // Ensure phone is clean
+  const finalPhone = cleanPhones[0] || '';
+  
   return {
-    name: finalName,
-    company: finalCompany,
+    name: name || '',
+    company: company || '',
     designation: designation || '',
     email: finalEmail,
-    phone: phones[0] || '',
-    website: websiteFromEmail || '',
+    phone: finalPhone,
+    website: finalWebsite || '',
     address: address || '',
     imageData: imageData, // Base64 encoded image data
   };
