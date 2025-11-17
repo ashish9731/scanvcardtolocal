@@ -266,8 +266,9 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
         const companyFromEmail = domainParts.length >= 2 
           ? domainParts[0].charAt(0).toUpperCase() + domainParts[0].slice(1)
           : '';
-        // Generate website with www prefix if not found in text
-        const websiteFromEmail = websiteFromText || `www.${domain}`;
+        // ONLY use website from email if it was explicitly found in text
+        // DO NOT generate website URL from email domain
+        const websiteFromEmail = websiteFromText || ''; // Keep empty if not found in text
         return { companyFromEmail, websiteFromEmail };
       }
     }
@@ -473,9 +474,8 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   company = companyFromEmail || companyFromWebsite;
   
   // WEBSITE EXTRACTION:
-  // Must contain domain suffix (.com, .in, .net, .ai etc.)
-  // Always ensure website starts with www. and has proper domain format
-  let finalWebsite = websiteFromEmail || websiteFromText;
+  // Use ONLY websites found in the text, never generate from company name or email
+  let finalWebsite = websiteFromText || websiteFromEmail; // Only use explicitly found websites
   
   // Ensure website always starts with www. and has proper format
   if (finalWebsite) {
