@@ -551,15 +551,22 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   
   // WEBSITE EXTRACTION:
   // Must contain domain suffix (.com, .in, .net, .ai etc.)
-  // Always ensure website starts with www.
+  // Always ensure website starts with www. and has proper domain format
   let finalWebsite = websiteFromEmail || websiteFromText;
   
-  // Ensure website always starts with www.
-  if (finalWebsite && !finalWebsite.startsWith('www.')) {
-    // Extract domain part and prepend www.
+  // Ensure website always starts with www. and has proper format
+  if (finalWebsite) {
+    // Remove any cleaning that might have removed dots
+    // Extract domain part and ensure proper www. format
     const domainMatch = finalWebsite.match(/(?:https?:\/\/)?(?:www\.)?([^\s]+)/i);
     if (domainMatch && domainMatch[1]) {
-      finalWebsite = `www.${domainMatch[1]}`;
+      // Check if it already has www.
+      if (finalWebsite.includes('www.')) {
+        finalWebsite = finalWebsite; // Keep as is
+      } else {
+        // Add www. prefix
+        finalWebsite = `www.${domainMatch[1]}`;
+      }
     }
   }
   
@@ -595,11 +602,20 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     }
   }
   
-  // Remove ALL junk characters from all fields EXCEPT email
+  // Remove ALL junk characters from all fields EXCEPT email and website
   const cleanText = (text: string): string => {
     if (!text) return '';
     return text
-      .replace(/[!*~"'/\-\\(),.?;:#^&[\]{}|<>`=+_]/g, '') // Remove ALL junk characters except @
+      .replace(/[!*~"'/\-\\(),.?;:#^&[\]{}|<>`=+_]/g, '') // Remove ALL junk characters except @ and .
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+  };
+  
+  // Special cleaner for website that preserves dots
+  const cleanWebsite = (text: string): string => {
+    if (!text) return '';
+    return text
+      .replace(/[!*~"'/\-\\(),?;:#^&[\]{}|<>`=+_]/g, '') // Remove junk characters but keep dots and @
       .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
   };
@@ -616,7 +632,7 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     designation: designation ? cleanText(designation) : '',
     email: finalEmail, // Keep email as is to preserve @
     phone: finalPhone,
-    website: finalWebsite ? cleanText(finalWebsite) : '',
+    website: finalWebsite ? cleanWebsite(finalWebsite) : '', // Use special cleaner for website
     address: address ? cleanText(address) : '',
     imageData: imageData, // Base64 encoded image data
   };
