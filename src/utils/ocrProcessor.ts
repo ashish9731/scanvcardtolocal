@@ -303,6 +303,9 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   
   // Comprehensive designation keywords
   const designationKeywords: string[] = [
+    'Lead', 'Investment Executive', 'Co-Founder', 'Business Development Manager', 'BDE', 
+    'Director', 'Head', 'Vice President', 'Senior Consultant', 'Consultant', 'Sr Consultant', 
+    'AI', "Founder's", 'Founder', 'Investor Relations',
     'Chairman', 'Chairperson', 'CEO', 'Chief Executive Officer', 'President', 
     'COO', 'Chief Operating Officer', 'CFO', 'Chief Financial Officer',
     'CIO', 'Chief Information Officer', 'CTO', 'Chief Technology Officer',
@@ -438,6 +441,45 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     }
   }
   
+  // Ensure name is never blank - fallback to first potential name if nothing else works
+  if (!name) {
+    // Look for any potential name in the card as last resort
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Skip empty lines
+      if (!line) continue;
+      
+      // Skip lines with numbers, emails, phones, websites
+      const hasNumbers = /\d/.test(line);
+      const hasEmail = emails.some(e => line.toLowerCase().includes(e));
+      const hasPhone = cleanPhones.some(p => line.includes(p.replace(/[\s-]/g, '')));
+      const isWebsite = line.toLowerCase().includes('www.') || line.toLowerCase().includes('.com') || line.toLowerCase().includes('.org');
+      
+      if (hasNumbers || hasEmail || hasPhone || isWebsite) continue;
+      
+      // Skip if it's a designation
+      const isDesignation = designationKeywords.some(kw => 
+        line.toLowerCase().includes(kw.toLowerCase())
+      );
+      
+      if (isDesignation) continue;
+      
+      // Check for names with reasonable length (1-4 words)
+      const words = line.split(' ');
+      const isReasonableLength = words.length >= 1 && words.length <= 4;
+      
+      if (isReasonableLength) {
+        // Additional validation: should not contain special characters typical of non-names
+        const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(line);
+        if (!hasSpecialChars) {
+          name = line;
+          break;
+        }
+      }
+    }
+  }
+  
   // DESIGNATION EXTRACTION:
   // Extract designation separately to avoid contamination with other fields
   for (const line of lines) {
@@ -470,7 +512,13 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   
   // WEBSITE EXTRACTION:
   // Use ONLY websites found in the text, never generate from company name or email
-  let finalWebsite = websiteFromText || websiteFromEmail; // Only use explicitly found websites
+  // Only use website if it explicitly contains 'www'
+  let finalWebsite = '';
+  if (websiteFromText && websiteFromText.includes('www')) {
+    finalWebsite = websiteFromText;
+  } else if (websiteFromEmail && websiteFromEmail.includes('www')) {
+    finalWebsite = websiteFromEmail;
+  }
   
   // Ensure website always starts with www. and has proper format
   if (finalWebsite) {
@@ -613,8 +661,14 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   // Ensure email is always populated if we have one (and always contains @)
   const finalEmail = emails[0] || '';
   
-  // Ensure phone is clean (take the first one if we have multiple)
-  const finalPhone = cleanPhones[0] || '';
+  // Ensure phone is never blank - try multiple approaches
+  let finalPhone = '';
+  if (cleanPhones.length > 0) {
+    finalPhone = cleanPhones[0];
+  } else if (phones.length > 0) {
+    // Fallback to original phone matches if clean phones is empty
+    finalPhone = phones[0];
+  }
   
   return {
     name: name ? cleanText(name) : '',
