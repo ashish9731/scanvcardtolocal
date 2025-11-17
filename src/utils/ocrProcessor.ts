@@ -330,11 +330,6 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   let company = '';
   let address = '';
   
-  // POSITION-BASED NAME EXTRACTION WITH EMAIL VALIDATION:
-  // 1. Look for names in top-left or centered positions
-  // 2. Validate name against email username if email exists
-  // 3. Fallback to email-based extraction only
-  
   // Extract email username for validation (part before @)
   let emailUsername = '';
   if (emails.length > 0 && emails[0].includes('@')) {
@@ -421,6 +416,31 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     }
   }
   
+  // DESIGNATION EXTRACTION:
+  // Extract designation separately to avoid contamination with other fields
+  for (const line of lines) {
+    for (const keyword of designationKeywords) {
+      // Check for exact matches or partial matches
+      if (line.toLowerCase().includes(keyword.toLowerCase())) {
+        // Ensure this line is not already captured as name, company, email, phone, website, or address
+        const isAlreadyCaptured = 
+          (name && line.toLowerCase().includes(name.toLowerCase())) ||
+          (company && line.toLowerCase().includes(company.toLowerCase())) ||
+          emails.some(e => line.toLowerCase().includes(e)) ||
+          phones.some(p => line.includes(p.replace(/[\s-]/g, ''))) ||
+          (websiteFromEmail && line.toLowerCase().includes(websiteFromEmail.toLowerCase())) ||
+          (websiteFromText && line.toLowerCase().includes(websiteFromText.toLowerCase())) ||
+          (address && line.toLowerCase().includes(address.toLowerCase()));
+        
+        if (!isAlreadyCaptured) {
+          designation = line.trim();
+          break;
+        }
+      }
+    }
+    if (designation) break;
+  }
+  
   // PHONE EXTRACTION:
   // Regex-based extraction of clean phone numbers with country codes
   let cleanPhones: string[] = [];
@@ -483,6 +503,11 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
       // Skip if line is empty
       if (!line) continue;
       
+      // Skip if it's clearly not a company (avoid capturing designations as companies)
+      const isDesignation = designationKeywords.some(kw => 
+        line.toLowerCase().includes(kw.toLowerCase())
+      );
+      
       const isAllCaps = line === line.toUpperCase() && line.length > 1;
       const hasNumbers = /\d/.test(line);
       const isPhone = cleanPhones.some(p => line.includes(p.replace(/[\s-]/g, '')));
@@ -490,7 +515,7 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
       const hasCompanySuffix = companySuffixes.some(suffix => line.toLowerCase().includes(suffix.toLowerCase()));
       
       // Skip if it's clearly not a company
-      if (isPhone || isEmail || hasNumbers) continue;
+      if (isPhone || isEmail || hasNumbers || isDesignation) continue;
       
       // Enhanced company detection logic:
       if (line.length > 1 && (isAllCaps || (words.length >= 2 && words.length <= 6) || hasCompanySuffix)) {
@@ -535,6 +560,15 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     const hasPhone = cleanPhones.some(p => line.includes(p.replace(/[\s-]/g, '')));
     
     if (hasEmail || hasPhone) continue;
+    
+    // Skip if it's already captured as name, company, designation, or website
+    const isAlreadyCaptured = 
+      (name && line.toLowerCase().includes(name.toLowerCase())) ||
+      (company && line.toLowerCase().includes(company.toLowerCase())) ||
+      (designation && line.toLowerCase().includes(designation.toLowerCase())) ||
+      (finalWebsite && line.toLowerCase().includes(finalWebsite.toLowerCase()));
+    
+    if (isAlreadyCaptured) continue;
     
     // Look for address-like content
     if (line.length > 15) { // Addresses are typically longer
