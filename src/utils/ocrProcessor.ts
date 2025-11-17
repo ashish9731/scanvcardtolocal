@@ -337,14 +337,14 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     emailUsername = emails[0].split('@')[0].toLowerCase();
   }
   
-  // NEW RULE: If email name from name@company.com matches any name on the card, take that name
-  // Otherwise, take name from email as currently implemented
+  // NAME EXTRACTION - PRIMARY METHOD:
+  // Search for name in the card first, email extraction is ONLY fallback
+  name = '';
   
-  // First, collect all potential names from the card
-  const potentialNames: {name: string, lineIndex: number}[] = [];
-  const topLines = lines.slice(0, Math.min(10, lines.length)); // Focus on top 10 lines
+  // Look for names in the card (top 10 lines where names are typically placed)
+  const topLines = lines.slice(0, Math.min(10, lines.length));
   
-  // Collect all potential names from the card
+  // First, try to find names with proper capitalization or all caps
   for (let i = 0; i < topLines.length; i++) {
     const line = topLines[i].trim();
     
@@ -354,7 +354,7 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     // Skip lines with numbers, emails, phones, websites
     const hasNumbers = /\d/.test(line);
     const hasEmail = emails.some(e => line.toLowerCase().includes(e));
-    const hasPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
+    const hasPhone = cleanPhones.some(p => line.includes(p.replace(/[\s-]/g, '')));
     const isWebsite = line.toLowerCase().includes('www.') || line.toLowerCase().includes('.com') || line.toLowerCase().includes('.org');
     
     if (hasNumbers || hasEmail || hasPhone || isWebsite) continue;
@@ -376,31 +376,51 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
       // Additional validation: names don't have special characters
       const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(line);
       if (!hasSpecialChars) {
-        potentialNames.push({name: line, lineIndex: i});
-      }
-    }
-  }
-  
-  // NEW RULE IMPLEMENTATION:
-  // If email name from name@company.com matches any name on the card, take that name
-  // Otherwise, take name from email as currently implemented
-  if (emailUsername) {
-    // Look for exact or close matches to the email username
-    for (const potentialName of potentialNames) {
-      // Convert name to lowercase for comparison and remove spaces
-      const nameForComparison = potentialName.name.toLowerCase().replace(/\s+/g, '');
-      
-      // Check if name matches or is similar to email username
-      if (emailUsername === nameForComparison || 
-          emailUsername.includes(nameForComparison) || 
-          nameForComparison.includes(emailUsername)) {
-        name = potentialName.name;
+        name = line;
         break;
       }
     }
   }
   
-  // If no matching name found on card, fallback to email-based extraction
+  // If no name found with proper formatting, try other potential names
+  if (!name) {
+    for (let i = 0; i < topLines.length; i++) {
+      const line = topLines[i].trim();
+      
+      // Skip empty lines
+      if (!line) continue;
+      
+      // Skip lines with numbers, emails, phones, websites
+      const hasNumbers = /\d/.test(line);
+      const hasEmail = emails.some(e => line.toLowerCase().includes(e));
+      const hasPhone = cleanPhones.some(p => line.includes(p.replace(/[\s-]/g, '')));
+      const isWebsite = line.toLowerCase().includes('www.') || line.toLowerCase().includes('.com') || line.toLowerCase().includes('.org');
+      
+      if (hasNumbers || hasEmail || hasPhone || isWebsite) continue;
+      
+      // Skip if it's a designation
+      const isDesignation = designationKeywords.some(kw => 
+        line.toLowerCase().includes(kw.toLowerCase())
+      );
+      
+      if (isDesignation) continue;
+      
+      // Check for names with reasonable length (1-4 words)
+      const words = line.split(' ');
+      const isReasonableLength = words.length >= 1 && words.length <= 4;
+      
+      if (isReasonableLength) {
+        // Additional validation: should not contain special characters typical of non-names
+        const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(line);
+        if (!hasSpecialChars) {
+          name = line;
+          break;
+        }
+      }
+    }
+  }
+  
+  // ONLY FALLBACK: If no name found in card, extract from email
   if (!name && emailUsername) {
     // Convert email username to proper name format (replace dots with spaces and capitalize)
     let extractedName = emailUsername.replace(/\./g, ' ') // Replace dots with spaces
