@@ -330,11 +330,10 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   let company = '';
   let address = '';
   
-  // POSITION-BASED NAME EXTRACTION:
-  // 1. Look for the largest font text (longest lines with proper name characteristics)
-  // 2. Check top-left or centered positioning
-  // 3. Ensure it's above title/position
-  // 4. Fallback to email-based extraction only
+  // POSITION-BASED NAME EXTRACTION WITH EMAIL VALIDATION:
+  // 1. Look for names in top-left or centered text
+  // 2. Validate name against email username if email exists
+  // 3. Fallback to email-based extraction only
   
   // First, identify potential designations to establish context
   const designationLines: number[] = [];
@@ -348,59 +347,66 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     }
   });
   
-  // Look for names in the top portion of the card, prioritizing position-based heuristics
-  const topLines = lines.slice(0, Math.min(6, lines.length)); // Focus on top 6 lines
+  // Extract email username for validation (part before @)
+  let emailUsername = '';
+  if (emails.length > 0 && emails[0].includes('@')) {
+    emailUsername = emails[0].split('@')[0].toLowerCase();
+  }
   
-  // Strategy 1: Find the longest line that looks like a name (largest font heuristic)
-  let longestNameCandidate = '';
-  let longestNameIndex = -1;
+  // Look for names in the top portion of the card
+  const topLines = lines.slice(0, Math.min(8, lines.length)); // Focus on top 8 lines
   
-  topLines.forEach((line, index) => {
-    const trimmedLine = line.trim();
+  // Strategy 1: Find names in top-left or centered positions
+  for (let i = 0; i < topLines.length; i++) {
+    const line = topLines[i].trim();
     
     // Skip empty lines
-    if (!trimmedLine) return;
+    if (!line) continue;
     
     // Skip lines with numbers, emails, phones, websites
-    const hasNumbers = /\d/.test(trimmedLine);
-    const hasEmail = emails.some(e => trimmedLine.toLowerCase().includes(e));
-    const hasPhone = phones.some(p => trimmedLine.includes(p.replace(/[\s-]/g, '')));
-    const isWebsite = trimmedLine.toLowerCase().includes('www.') || trimmedLine.toLowerCase().includes('.com') || trimmedLine.toLowerCase().includes('.org');
+    const hasNumbers = /\d/.test(line);
+    const hasEmail = emails.some(e => line.toLowerCase().includes(e));
+    const hasPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
+    const isWebsite = line.toLowerCase().includes('www.') || line.toLowerCase().includes('.com') || line.toLowerCase().includes('.org');
     
-    if (hasNumbers || hasEmail || hasPhone || isWebsite) return;
+    if (hasNumbers || hasEmail || hasPhone || isWebsite) continue;
     
     // Skip if it's a designation
     const isDesignation = designationKeywords.some(kw => 
-      trimmedLine.toLowerCase().includes(kw.toLowerCase())
+      line.toLowerCase().includes(kw.toLowerCase())
     );
     
-    if (isDesignation) return;
+    if (isDesignation) continue;
     
     // Check if it looks like a name (proper capitalization or all caps)
-    const isAllCaps = trimmedLine === trimmedLine.toUpperCase() && trimmedLine.length > 1;
-    const isProperlyCapitalized = /^[A-Z][a-z]+(\s[A-Z][a-z]+)*$/.test(trimmedLine);
-    const words = trimmedLine.split(' ');
+    const isAllCaps = line === line.toUpperCase() && line.length > 1;
+    const isProperlyCapitalized = /^[A-Z][a-z]+(\s[A-Z][a-z]+)*$/.test(line);
+    const words = line.split(' ');
     const isReasonableLength = words.length >= 1 && words.length <= 4;
     
     if (isReasonableLength && (isAllCaps || isProperlyCapitalized)) {
       // Additional validation: names don't have special characters
-      const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(trimmedLine);
+      const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(line);
       if (!hasSpecialChars) {
-        // Prefer longer names as they're likely to be the main name
-        if (trimmedLine.length > longestNameCandidate.length) {
-          longestNameCandidate = trimmedLine;
-          longestNameIndex = index;
+        // If we have an email, validate the name against email username
+        if (emailUsername) {
+          // Convert name to lowercase for comparison
+          const nameForComparison = line.toLowerCase().replace(/\s+/g, '');
+          // Check if name matches or is similar to email username
+          if (emailUsername.includes(nameForComparison) || nameForComparison.includes(emailUsername)) {
+            name = line;
+            break;
+          }
+        } else {
+          // No email to validate against, take the first valid name
+          name = line;
+          break;
         }
       }
     }
-  });
-  
-  // If we found a long name candidate, use it
-  if (longestNameCandidate) {
-    name = longestNameCandidate;
   }
   
-  // Strategy 2: If no long name found, look for names above designations
+  // Strategy 2: If no name found or validation failed, try names above designations
   if (!name && designationLines.length > 0) {
     const firstDesignationIndex = Math.min(...designationLines);
     // Look for names in lines above the first designation
@@ -428,31 +434,39 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
         // Additional validation: names don't have special characters
         const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(line);
         if (!hasSpecialChars) {
-          name = line;
-          break;
+          // If we have an email, validate the name against email username
+          if (emailUsername) {
+            // Convert name to lowercase for comparison
+            const nameForComparison = line.toLowerCase().replace(/\s+/g, '');
+            // Check if name matches or is similar to email username
+            if (emailUsername.includes(nameForComparison) || nameForComparison.includes(emailUsername)) {
+              name = line;
+              break;
+            }
+          } else {
+            // No email to validate against, take the first valid name
+            name = line;
+            break;
+          }
         }
       }
     }
   }
   
   // Strategy 3: Fallback to email-based extraction ONLY (no other fallbacks)
-  if (!name && emails.length > 0) {
-    const emailParts = emails[0].split('@');
-    if (emailParts.length === 2) {
-      const username = emailParts[0];
-      // Convert username to proper name format (replace dots with spaces and capitalize)
-      let extractedName = username.replace(/\./g, ' ') // Replace dots with spaces
-        .replace(/\b\w/g, char => char.toUpperCase()) // Capitalize first letter of each word
-        .trim();
-      
-      // Validate the extracted name (1-4 words, no numbers)
-      const words = extractedName.split(' ');
-      const hasNumbers = /\d/.test(extractedName);
-      const isReasonableLength = words.length >= 1 && words.length <= 4;
-      
-      if (isReasonableLength && !hasNumbers) {
-        name = extractedName;
-      }
+  if (!name && emails.length > 0 && emailUsername) {
+    // Convert email username to proper name format (replace dots with spaces and capitalize)
+    let extractedName = emailUsername.replace(/\./g, ' ') // Replace dots with spaces
+      .replace(/\b\w/g, char => char.toUpperCase()) // Capitalize first letter of each word
+      .trim();
+    
+    // Validate the extracted name (1-4 words, no numbers)
+    const words = extractedName.split(' ');
+    const hasNumbers = /\d/.test(extractedName);
+    const isReasonableLength = words.length >= 1 && words.length <= 4;
+    
+    if (isReasonableLength && !hasNumbers) {
+      name = extractedName;
     }
   }
   
@@ -581,17 +595,17 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     }
   }
   
-  // Remove ALL junk characters from all fields
+  // Remove ALL junk characters from all fields EXCEPT email
   const cleanText = (text: string): string => {
     if (!text) return '';
     return text
-      .replace(/[!*~"'/\-\\(),.?;:#@^&[\]{}|<>`=+_]/g, '') // Remove ALL junk characters
+      .replace(/[!*~"'/\-\\(),.?;:#^&[\]{}|<>`=+_]/g, '') // Remove ALL junk characters except @
       .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
   };
   
-  // Ensure email is always populated if we have one
-  const finalEmail = emails[0] ? cleanText(emails[0]) : '';
+  // Ensure email is always populated if we have one (and always contains @)
+  const finalEmail = emails[0] || '';
   
   // Ensure phone is clean
   const finalPhone = cleanPhones[0] || '';
@@ -600,7 +614,7 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     name: name ? cleanText(name) : '',
     company: company ? cleanText(company) : '',
     designation: designation ? cleanText(designation) : '',
-    email: finalEmail,
+    email: finalEmail, // Keep email as is to preserve @
     phone: finalPhone,
     website: finalWebsite ? cleanText(finalWebsite) : '',
     address: address ? cleanText(address) : '',
