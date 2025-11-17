@@ -228,8 +228,8 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   const emailMatches = normalizedText.match(emailRegex);
   const emails: string[] = emailMatches ? Array.from(emailMatches).map(e => e.toLowerCase()) : [];
   
-  // Enhanced phone regex - supports various formats
-  const phoneRegex = /(\+?\d{1,4}[\s-]?)?\(?\d{2,5}\)?[\s-]?\d{3,5}[\s-]?\d{4,5}/g;
+  // Enhanced phone regex - supports various formats including country codes
+  const phoneRegex = /(\+?\d{1,4}[\s-]?)?\(?\d{1,4}\)?[\s-]?\d{1,4}[\s-]?\d{1,4}[\s-]?\d{1,9}/g;
   const phoneMatches = normalizedText.match(phoneRegex);
   const phones: string[] = phoneMatches ? Array.from(new Set(phoneMatches.map(p => p.trim()))) : [];
   
@@ -289,9 +289,9 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   // FIXED RULES IMPLEMENTATION:
   
   // NAME EXTRACTION:
-  // 1. Largest capitalized 2-3 word line
+  // 1. Largest capitalized 2-3 word line (big bold letters)
   // 2. From email if name not clearly mentioned
-  for (let i = 0; i < Math.min(10, lines.length); i++) {
+  for (let i = 0; i < Math.min(12, lines.length); i++) {
     const line = lines[i].trim();
     const words = line.split(' ');
     
@@ -320,10 +320,10 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     // Look for potential names:
     // - All caps (common for names on business cards)
     // - Properly capitalized (First Last)
-    // - Reasonable length (2-3 words)
-    const isAllCaps = line === line.toUpperCase() && line.length > 2;
+    // - Reasonable length (1-4 words)
+    const isAllCaps = line === line.toUpperCase() && line.length > 1;
     const isProperlyCapitalized = /^[A-Z][a-z]+(\s[A-Z][a-z]+)*$/.test(line);
-    const isReasonableLength = words.length >= 1 && words.length <= 3;
+    const isReasonableLength = words.length >= 1 && words.length <= 4;
     
     if (isReasonableLength && (isAllCaps || isProperlyCapitalized)) {
       // Additional validation: check if it looks like a real name
@@ -362,16 +362,24 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   }
   
   // PHONE EXTRACTION:
-  // Regex-based extraction of clean phone numbers
-  // Exclude numbers that are part of addresses
+  // Regex-based extraction of clean phone numbers with country codes
   let cleanPhones: string[] = [];
   if (phones.length > 0) {
-    // Filter out phone-like numbers that might be part of addresses
-    cleanPhones = phones.filter(phone => {
-      // Remove spaces and dashes for length checking
-      const cleanPhone = phone.replace(/[\s-]/g, '');
+    // Process each phone to clean it
+    cleanPhones = phones.map(phone => {
+      // Remove all non-digit characters except + at the beginning
+      let cleanPhone = phone.replace(/[^+\d]/g, '');
+      // Ensure + is only at the beginning if present
+      if (cleanPhone.startsWith('+')) {
+        cleanPhone = '+' + cleanPhone.substring(1);
+      }
+      return cleanPhone;
+    }).filter(phone => {
+      // Filter out invalid phones
+      // Remove + for length checking
+      const digitsOnly = phone.replace(/\+/g, '');
       // Phone numbers typically 7-15 digits
-      return cleanPhone.length >= 7 && cleanPhone.length <= 15 && /\d/.test(cleanPhone);
+      return digitsOnly.length >= 7 && digitsOnly.length <= 15 && /\d/.test(digitsOnly);
     });
   }
   
@@ -382,7 +390,7 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   
   // If still no company, look for company indicators in text
   if (!company) {
-    const logoAreaLines = lines.slice(0, Math.min(8, lines.length));
+    const logoAreaLines = lines.slice(0, Math.min(10, lines.length));
     const companySuffixes = ['Inc', 'LLC', 'Ltd', 'Corp', 'Corporation', 'Company', 'Co', 'Group', 'Associates', 'Partners', 'Enterprises', 'Solutions', 'Technologies', 'Tech', 'Industries', 'Holdings', 'Ventures', 'Capital'];
     
     for (let i = 0; i < logoAreaLines.length; i++) {
@@ -445,20 +453,29 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     }
   }
   
+  // Remove garbage characters from all fields
+  const cleanText = (text: string): string => {
+    if (!text) return '';
+    return text
+      .replace(/[!*~"'/\-]/g, '') // Remove garbage characters
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+  };
+  
   // Ensure email is always populated if we have one
-  const finalEmail = emails[0] || '';
+  const finalEmail = emails[0] ? cleanText(emails[0]) : '';
   
   // Ensure phone is clean
   const finalPhone = cleanPhones[0] || '';
   
   return {
-    name: name || '',
-    company: company || '',
-    designation: designation || '',
+    name: name ? cleanText(name) : '',
+    company: company ? cleanText(company) : '',
+    designation: designation ? cleanText(designation) : '',
     email: finalEmail,
     phone: finalPhone,
-    website: finalWebsite || '',
-    address: address || '',
+    website: finalWebsite ? cleanText(finalWebsite) : '',
+    address: address ? cleanText(address) : '',
     imageData: imageData, // Base64 encoded image data
   };
 };
