@@ -442,23 +442,22 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   }
   
   // PHONE EXTRACTION:
-  // Enhanced regex-based extraction of clean phone numbers with country codes
+  // Completely rewrite phone extraction with simpler, more effective approach
   let cleanPhones: string[] = [];
   
-  // Prioritize phone numbers that start with + (international format)
-  const internationalPhoneRegex = /\+\d{1,4}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/g;
-  const internationalMatches = normalizedText.match(internationalPhoneRegex);
-  if (internationalMatches) {
-    for (const phone of internationalMatches) {
-      // Clean the phone number
+  // Simple but effective phone regex that captures + format numbers
+  const simplePhoneRegex = /[\+]?[\d\s\-\(\)]{7,20}/g;
+  const simplePhoneMatches = normalizedText.match(simplePhoneRegex);
+  if (simplePhoneMatches) {
+    for (const phone of simplePhoneMatches) {
+      // Clean the phone number - keep only digits and + at the beginning
       let cleanPhone = phone.replace(/[^+\d]/g, '');
-      // Ensure + is only at the beginning
+      // Ensure + is only at the beginning if present
       if (cleanPhone.startsWith('+')) {
         cleanPhone = '+' + cleanPhone.substring(1);
       }
-      // Validate the cleaned phone
+      // Validate the cleaned phone - 7-15 digits
       const digitsOnly = cleanPhone.replace(/\+/g, '');
-      // Phone numbers typically 7-15 digits
       if (digitsOnly.length >= 7 && digitsOnly.length <= 15 && /\d/.test(digitsOnly)) {
         // Avoid duplicates
         if (!cleanPhones.includes(cleanPhone)) {
@@ -468,141 +467,10 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     }
   }
   
-  // Additional patterns for other phone formats
-  const phonePatterns = [
-    // Standard US format with parentheses
-    /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g,
-    // Simple format with separators
-    /\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/g,
-    // International format without +
-    /\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/g,
-    // Simple 10-digit format
-    /\d{10}/g,
-    // Format with spaces
-    /\d{3}\s\d{3}\s\d{4}/g
-  ];
-  
-  // Try each pattern to find additional phone numbers
-  for (const pattern of phonePatterns) {
-    const phoneMatches = normalizedText.match(pattern);
-    if (phoneMatches) {
-      for (const phone of phoneMatches) {
-        // Clean the phone number
-        let cleanPhone = phone.replace(/[^+\d]/g, '');
-        // Ensure + is only at the beginning if present
-        if (cleanPhone.startsWith('+')) {
-          cleanPhone = '+' + cleanPhone.substring(1);
-        }
-        // Validate the cleaned phone
-        const digitsOnly = cleanPhone.replace(/\+/g, '');
-        // Phone numbers typically 7-15 digits
-        if (digitsOnly.length >= 7 && digitsOnly.length <= 15 && /\d/.test(digitsOnly)) {
-          // Avoid duplicates
-          if (!cleanPhones.includes(cleanPhone)) {
-            cleanPhones.push(cleanPhone);
-          }
-        }
-      }
-    }
-  }
-  
-  // Aggressive line-by-line search for phone-like patterns
-  // This is especially important for numbers that might be split across lines
-  for (const line of lines) {
-    // Look for phone numbers in each line with special attention to + format
-    const linePatterns = [
-      // International format with +
-      /\+\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/g,
-      // General pattern for various separators
-      /[\+]?[\d\s\-\(\)]{7,20}/g,
-      // US format
-      /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g,
-      // International without +
-      /\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/g
-    ];
-    
-    for (const pattern of linePatterns) {
-      const potentialPhones = line.match(pattern);
-      if (potentialPhones) {
-        for (const phone of potentialPhones) {
-          // Clean the phone number
-          let cleanPhone = phone.replace(/[^+\d]/g, '');
-          if (cleanPhone.startsWith('+')) {
-            cleanPhone = '+' + cleanPhone.substring(1);
-          }
-          // Validate the cleaned phone
-          const digitsOnly = cleanPhone.replace(/\+/g, '');
-          if (digitsOnly.length >= 7 && digitsOnly.length <= 15 && /\d/.test(digitsOnly)) {
-            // Avoid duplicates
-            if (!cleanPhones.includes(cleanPhone)) {
-              cleanPhones.push(cleanPhone);
-            }
-          }
-        }
-      }
-    }
-  }
-  
-  // Ensure we capture any phone number that starts with +
-  // This is a critical fix for the user's issue
-  const plusPhoneRegex = /\+\d[\d\s\-\(\)]{6,19}/g;
-  const plusPhoneMatches = normalizedText.match(plusPhoneRegex);
-  if (plusPhoneMatches) {
-    for (const phone of plusPhoneMatches) {
-      // Clean the phone number
-      let cleanPhone = phone.replace(/[^+\d]/g, '');
-      if (cleanPhone.startsWith('+')) {
-        cleanPhone = '+' + cleanPhone.substring(1);
-      }
-      // Validate the cleaned phone
-      const digitsOnly = cleanPhone.replace(/\+/g, '');
-      if (digitsOnly.length >= 7 && digitsOnly.length <= 15 && /\d/.test(digitsOnly)) {
-        // Avoid duplicates and prioritize + format
-        if (!cleanPhones.includes(cleanPhone)) {
-          cleanPhones.unshift(cleanPhone); // Put + numbers at the beginning
-        }
-      }
-    }
-  }
-  
   // COMPANY EXTRACTION:
   // Contains business suffix OR bold/large text near top
   // From email after @ and before .com/.co/.in
   company = companyFromEmail || companyFromWebsite;
-  
-  // If still no company, look for company indicators in text
-  if (!company) {
-    const logoAreaLines = lines.slice(0, Math.min(10, lines.length));
-    const companySuffixes = ['Inc', 'LLC', 'Ltd', 'Corp', 'Corporation', 'Company', 'Co', 'Group', 'Associates', 'Partners', 'Enterprises', 'Solutions', 'Technologies', 'Tech', 'Industries', 'Holdings', 'Ventures', 'Capital'];
-    
-    for (let i = 0; i < logoAreaLines.length; i++) {
-      const line = logoAreaLines[i].trim();
-      const words = line.split(' ');
-      
-      // Skip if line is empty
-      if (!line) continue;
-      
-      // Skip if it's clearly not a company (avoid capturing designations as companies)
-      const isDesignation = designationKeywords.some(kw => 
-        line.toLowerCase().includes(kw.toLowerCase())
-      );
-      
-      const isAllCaps = line === line.toUpperCase() && line.length > 1;
-      const hasNumbers = /\d/.test(line);
-      const isPhone = cleanPhones.some(p => line.includes(p.replace(/[\s-]/g, '')));
-      const isEmail = emails.some(e => line.toLowerCase().includes(e));
-      const hasCompanySuffix = companySuffixes.some(suffix => line.toLowerCase().includes(suffix.toLowerCase()));
-      
-      // Skip if it's clearly not a company
-      if (isPhone || isEmail || hasNumbers || isDesignation) continue;
-      
-      // Enhanced company detection logic:
-      if (line.length > 1 && (isAllCaps || (words.length >= 2 && words.length <= 6) || hasCompanySuffix)) {
-        company = line;
-        break;
-      }
-    }
-  }
   
   // WEBSITE EXTRACTION:
   // Must contain domain suffix (.com, .in, .net, .ai etc.)
@@ -626,44 +494,107 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   }
   
   // ADDRESS EXTRACTION:
-  // Longest multi-line block containing words + digits + commas
+  // Implement the specific rules you provided
+  // Characteristics: Longest multi-line block containing words + digits + commas
   // Must contain address indicators (Road, Street, Lane, Floor, City, ZIP)
-  const addressKeywords: string[] = ['street', 'st', 'road', 'rd', 'avenue', 'ave', 'blvd', 'boulevard', 'suite', 'floor', 'building', 'block', 'sector', 'area', 'city', 'zip', 'pin', 'code', 'lane', 'ln', 'drive', 'dr', 'court', 'ct', 'place', 'pl', 'apartment', 'apt'];
+  address = '';
   
-  // Look for address-like content from bottom up (addresses often at bottom)
+  // Address indicators as specified
+  const addressKeywords = [
+    'road', 'street', 'st', 'ave', 'avenue', 'lane', 'block', 'tower', 'floor', 
+    'city', 'zip', 'postal', 'po box', 'building', 'bldg', 'suite', 'apartment', 'apt',
+    'drive', 'dr', 'court', 'ct', 'place', 'pl', 'boulevard', 'blvd', 'circle', 'cr',
+    'india', 'us', 'usa', 'united states', 'uk', 'united kingdom', 'canada', 'australia'
+  ];
+  
+  // Find the longest continuous text block that matches address criteria
+  let bestAddressCandidate = '';
+  
+  // Process lines from bottom up since addresses are often at the bottom
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i].trim();
     
-    // Skip if line contains email or phone
+    // Skip empty lines
+    if (!line) continue;
+    
+    // Skip if it's clearly not an address (phone numbers, emails, websites)
     const hasEmail = emails.some(e => line.toLowerCase().includes(e.toLowerCase()));
     const hasPhone = cleanPhones.some(p => line.includes(p.replace(/[\s-]/g, '')));
+    const hasWebsite = (finalWebsite && line.toLowerCase().includes(finalWebsite.toLowerCase()));
     
-    if (hasEmail || hasPhone) continue;
+    if (hasEmail || hasPhone || hasWebsite) continue;
     
-    // Skip if it's already captured as name, company, designation, or website
-    const isAlreadyCaptured = 
-      (name && line.toLowerCase().includes(name.toLowerCase())) ||
-      (company && line.toLowerCase().includes(company.toLowerCase())) ||
-      (designation && line.toLowerCase().includes(designation.toLowerCase())) ||
-      (finalWebsite && line.toLowerCase().includes(finalWebsite.toLowerCase()));
+    // Check if line has address characteristics
+    const hasNumbers = /\d/.test(line);
+    const hasCommas = line.includes(',');
+    const hasAddressKeyword = addressKeywords.some(keyword => 
+      line.toLowerCase().includes(keyword.toLowerCase())
+    );
     
-    if (isAlreadyCaptured) continue;
-    
-    // Look for address-like content
-    if (line.length > 15) { // Addresses are typically longer
-      const hasAddressKeyword = addressKeywords.some((kw: string) => line.toLowerCase().includes(kw));
-      const hasNumbers = /\d/.test(line);
-      const hasCommas = line.includes(',');
+    // Must have numbers and either commas or address keywords
+    if (hasNumbers && (hasCommas || hasAddressKeyword)) {
+      // Additional validation - should not contain designation keywords
+      const isDesignation = designationKeywords.some(kw => 
+        line.toLowerCase().includes(kw.toLowerCase())
+      );
       
-      // Must have numbers and either address keywords or commas
-      if (hasNumbers && (hasAddressKeyword || hasCommas)) {
-        // Additional validation: should not contain email patterns
-        if (!line.includes('@') && !line.includes('www')) {
-          address = line;
-          break;
+      if (!isDesignation) {
+        // This looks like a good address candidate
+        // Check if it's longer than our current best
+        if (line.length > bestAddressCandidate.length) {
+          bestAddressCandidate = line;
         }
       }
     }
+  }
+  
+  // If we didn't find a good candidate, try a different approach
+  // Look for multi-line blocks that might contain addresses
+  if (!bestAddressCandidate) {
+    // Join consecutive lines and look for address patterns
+    for (let i = Math.max(0, lines.length - 10); i < lines.length; i++) {
+      // Try combining current line with next few lines
+      for (let j = 1; j <= 3 && i + j < lines.length; j++) {
+        const combinedLines = lines.slice(i, i + j + 1).join(', ').trim();
+        
+        // Skip if empty
+        if (!combinedLines) continue;
+        
+        // Skip if it's clearly not an address
+        const hasEmail = emails.some(e => combinedLines.toLowerCase().includes(e.toLowerCase()));
+        const hasPhone = cleanPhones.some(p => combinedLines.includes(p.replace(/[\s-]/g, '')));
+        const hasWebsite = (finalWebsite && combinedLines.toLowerCase().includes(finalWebsite.toLowerCase()));
+        
+        if (hasEmail || hasPhone || hasWebsite) continue;
+        
+        // Check address characteristics
+        const hasNumbers = /\d/.test(combinedLines);
+        const hasCommas = combinedLines.includes(',');
+        const hasAddressKeyword = addressKeywords.some(keyword => 
+          combinedLines.toLowerCase().includes(keyword.toLowerCase())
+        );
+        
+        // Must have numbers and either commas or address keywords
+        if (hasNumbers && (hasCommas || hasAddressKeyword)) {
+          // Additional validation
+          const isDesignation = designationKeywords.some(kw => 
+            combinedLines.toLowerCase().includes(kw.toLowerCase())
+          );
+          
+          if (!isDesignation) {
+            // This looks like a good address candidate
+            if (combinedLines.length > bestAddressCandidate.length) {
+              bestAddressCandidate = combinedLines;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Set the address if we found a good candidate
+  if (bestAddressCandidate) {
+    address = bestAddressCandidate;
   }
   
   // Remove ALL junk characters from all fields EXCEPT email and website
@@ -687,7 +618,7 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   // Ensure email is always populated if we have one (and always contains @)
   const finalEmail = emails[0] || '';
   
-  // Ensure phone is clean
+  // Ensure phone is clean (take the first one if we have multiple)
   const finalPhone = cleanPhones[0] || '';
   
   return {
