@@ -363,55 +363,17 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     emailUsername = emails[0].split('@')[0].toLowerCase();
   }
   
-  // NAME EXTRACTION - PRIMARY METHOD:
-  // Search for name in the card first, email extraction is ONLY fallback
-  name = '';
-  
-  // Look for names in the card (top 10 lines where names are typically placed)
-  const topLines = lines.slice(0, Math.min(10, lines.length));
-  
-  // First, try to find names with proper capitalization or all caps
-  for (let i = 0; i < topLines.length; i++) {
-    const line = topLines[i].trim();
+  // NEW RULE IMPLEMENTATION:
+  // 1. Check email address for name
+  // 2. Look in the entire card to search for the name
+  // 3. Put correct name in column after this validation
+  if (emailUsername) {
+    // Look for exact or close matches to the email username in the entire card
+    const potentialNames: {name: string, lineIndex: number}[] = [];
     
-    // Skip empty lines
-    if (!line) continue;
-    
-    // Skip lines with numbers, emails, phones, websites
-    const hasNumbers = /\d/.test(line);
-    const hasEmail = emails.some(e => line.toLowerCase().includes(e));
-    const hasPhone = cleanPhones.some(p => line.includes(p.replace(/[\s-]/g, '')));
-    const isWebsite = line.toLowerCase().includes('www.') || line.toLowerCase().includes('.com') || line.toLowerCase().includes('.org');
-    
-    if (hasNumbers || hasEmail || hasPhone || isWebsite) continue;
-    
-    // Skip if it's a designation
-    const isDesignation = designationKeywords.some(kw => 
-      line.toLowerCase().includes(kw.toLowerCase())
-    );
-    
-    if (isDesignation) continue;
-    
-    // Check if it looks like a name (proper capitalization or all caps)
-    const isAllCaps = line === line.toUpperCase() && line.length > 1;
-    const isProperlyCapitalized = /^[A-Z][a-z]+(\s[A-Z][a-z]+)*$/.test(line);
-    const words = line.split(' ');
-    const isReasonableLength = words.length >= 1 && words.length <= 4;
-    
-    if (isReasonableLength && (isAllCaps || isProperlyCapitalized)) {
-      // Additional validation: names don't have special characters
-      const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(line);
-      if (!hasSpecialChars) {
-        name = line;
-        break;
-      }
-    }
-  }
-  
-  // If no name found with proper formatting, try other potential names
-  if (!name) {
-    for (let i = 0; i < topLines.length; i++) {
-      const line = topLines[i].trim();
+    // Collect all potential names from the card
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
       
       // Skip empty lines
       if (!line) continue;
@@ -439,14 +401,27 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
         // Additional validation: should not contain special characters typical of non-names
         const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(line);
         if (!hasSpecialChars) {
-          name = line;
-          break;
+          potentialNames.push({name: line, lineIndex: i});
         }
+      }
+    }
+    
+    // Look for exact or close matches to the email username
+    for (const potentialName of potentialNames) {
+      // Convert name to lowercase for comparison and remove spaces
+      const nameForComparison = potentialName.name.toLowerCase().replace(/\s+/g, '');
+      
+      // Check if name matches or is similar to email username
+      if (emailUsername === nameForComparison || 
+          emailUsername.includes(nameForComparison) || 
+          nameForComparison.includes(emailUsername)) {
+        name = potentialName.name;
+        break;
       }
     }
   }
   
-  // ONLY FALLBACK: If no name found in card, extract from email
+  // ONLY FALLBACK: If no matching name found in card, extract from email
   if (!name && emailUsername) {
     // Convert email username to proper name format (replace dots with spaces and capitalize)
     let extractedName = emailUsername.replace(/\./g, ' ') // Replace dots with spaces
