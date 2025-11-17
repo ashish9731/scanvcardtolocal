@@ -512,27 +512,39 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   
   // WEBSITE EXTRACTION:
   // Use ONLY websites found in the text, never generate from company name or email
-  // Only use website if it explicitly contains 'www'
+  // Specifically look for websites starting with www.
   let finalWebsite = '';
-  if (websiteFromText && websiteFromText.includes('www')) {
-    finalWebsite = websiteFromText;
-  } else if (websiteFromEmail && websiteFromEmail.includes('www')) {
-    finalWebsite = websiteFromEmail;
+  
+  // More precise regex to capture websites starting with www.
+  const wwwWebsiteRegex = /(https?:\/\/)?(www\.[\w-]+\.[\w.-]+)/gi;
+  const wwwWebsiteMatches = normalizedText.match(wwwWebsiteRegex);
+  
+  if (wwwWebsiteMatches && wwwWebsiteMatches.length > 0) {
+    // Take the first match that starts with www.
+    for (const match of wwwWebsiteMatches) {
+      if (match.toLowerCase().includes('www.')) {
+        finalWebsite = match.toLowerCase();
+        break;
+      }
+    }
+  }
+  
+  // Fallback to previous method if no www. website found
+  if (!finalWebsite) {
+    if (websiteFromText && websiteFromText.includes('www')) {
+      finalWebsite = websiteFromText;
+    } else if (websiteFromEmail && websiteFromEmail.includes('www')) {
+      finalWebsite = websiteFromEmail;
+    }
   }
   
   // Ensure website always starts with www. and has proper format
   if (finalWebsite) {
     // Remove any cleaning that might have removed dots
     // Extract domain part and ensure proper www. format
-    const domainMatch = finalWebsite.match(/(?:https?:\/\/)?(?:www\.)?([^\s]+)/i);
+    const domainMatch = finalWebsite.match(/(?:https?:\/\/)?(www\.[^\s]+)/i);
     if (domainMatch && domainMatch[1]) {
-      // Check if it already has www.
-      if (finalWebsite.includes('www.')) {
-        finalWebsite = finalWebsite; // Keep as is
-      } else {
-        // Add www. prefix
-        finalWebsite = `www.${domainMatch[1]}`;
-      }
+      finalWebsite = domainMatch[1]; // Use the www. version directly
     }
   }
   
