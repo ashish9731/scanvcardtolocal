@@ -29,6 +29,10 @@ const resizeImageForOCR = (imageData: string): Promise<string> => {
       // Return resized image data
       resolve(canvas.toDataURL('image/jpeg', 0.8));
     };
+    img.onerror = () => {
+      // If image fails to load, return original
+      resolve(imageData);
+    };
     img.src = imageData;
   });
 };
@@ -46,6 +50,15 @@ export interface CardData {
 }
 
 export const processImage = async (imageData: string): Promise<CardData> => {
+  // Validate input
+  if (!imageData) {
+    throw new Error('No image data provided');
+  }
+  
+  // Check if we're in a cross-origin isolated context
+  const isCrossOriginIsolated = window.crossOriginIsolated;
+  console.log('Cross-origin isolation status:', isCrossOriginIsolated);
+  
   const worker = await createWorker('eng');
   
   try {
@@ -59,15 +72,21 @@ export const processImage = async (imageData: string): Promise<CardData> => {
     // Resize image for better performance if it's too large
     const resizedImageData = await resizeImageForOCR(imageData);
     
-    const { data: { text } } = await worker.recognize(resizedImageData);
-    
-    // Parse extracted text
-    const parsedData = parseCardData(text, resizedImageData);
-    
-    return {
-      id: Date.now().toString(),
-      ...parsedData,
-    };
+    // Perform OCR with error handling
+    try {
+      const { data: { text } } = await worker.recognize(resizedImageData);
+      
+      // Parse extracted text
+      const parsedData = parseCardData(text, resizedImageData);
+      
+      return {
+        id: Date.now().toString(),
+        ...parsedData,
+      };
+    } catch (ocrError) {
+      console.error('OCR processing error:', ocrError);
+      throw new Error(`Failed to process image: ${ocrError.message || 'Unknown OCR error'}`);
+    }
   } finally {
     await worker.terminate();
   }

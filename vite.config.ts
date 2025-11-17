@@ -7,6 +7,12 @@ export default defineConfig({
   server: {
     host: "::",
     port: 8080,
+    headers: {
+      // Configure COOP and COEP headers for better camera access
+      "Cross-Origin-Embedder-Policy": "require-corp",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "cross-origin"
+    }
   },
   plugins: [react()],
   resolve: {

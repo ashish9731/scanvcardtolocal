@@ -13,6 +13,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -96,6 +97,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
 
   const clearImage = () => {
     setPreview(null);
+    setCameraError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -111,6 +113,9 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
   };
 
   const startCamera = async (autoCapture = false) => {
+    // Reset any previous errors
+    setCameraError(null);
+    
     // Check if device is in landscape mode
     if (window.innerWidth < window.innerHeight) {
       toast({
@@ -128,7 +133,10 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
         setCameraStream(null);
       }
       
-      // Auto-capture mode removed
+      // Check if we're in a cross-origin isolated context
+      if (window.crossOriginIsolated) {
+        console.warn('Cross-origin isolation is enabled, which may affect camera access');
+      }
 
       // Try environment camera first (rear camera for mobile)
       let stream;
@@ -194,13 +202,30 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
           });
         };
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Camera Error:", error);
-      toast({
-        title: "Camera Access Failed",
-        description: "Unable to access camera. Please check permissions and try again.",
-        variant: "destructive",
-      });
+      setCameraError(error.message || "Unknown camera error");
+      
+      // Handle specific Cross-Origin errors
+      if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
+        toast({
+          title: "Camera Access Blocked",
+          description: "Please allow camera access in your browser settings and try again.",
+          variant: "destructive",
+        });
+      } else if (error.name === 'NotFoundError' || error.name === 'OverconstrainedError') {
+        toast({
+          title: "Camera Not Found",
+          description: "No camera found on this device. Please upload an image instead.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Camera Access Failed",
+          description: "Unable to access camera. Please check permissions and try again.",
+          variant: "destructive",
+        });
+      }
       setShowCamera(false);
     }
   };
@@ -209,248 +234,26 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
     startCamera();
   };
   
-  // Function to draw detected corners for visual feedback
-  const drawCorners = (canvas: HTMLCanvasElement, corners: {x: number, y: number, gradient: number}[]) => {
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.fillStyle = '#ff0000';
-      corners.forEach(corner => {
-        ctx.beginPath();
-        ctx.arc(corner.x, corner.y, 5, 0, 2 * Math.PI);
-        ctx.fill();
-      });
-    }
-  };
-  
-  // Function to detect card boundaries using corner detection
-  const detectCardBoundariesWithCorners = (imageData: ImageData) => {
-    const width = imageData.width;
-    const height = imageData.height;
-    const data = imageData.data;
-    
-    // Corner detection algorithm for business card alignment
-    // This simulates detecting the four corners of a business card
-    
-    // Find potential corner points by analyzing gradient changes
-    const corners = [];
-    const threshold = 30; // Sensitivity threshold for corner detection
-    
-    // Sample pixels to find corners (every 10th pixel for performance)
-    for (let y = 10; y < height - 10; y += 10) {
-      for (let x = 10; x < width - 10; x += 10) {
-        const idx = (y * width + x) * 4;
-        
-        // Calculate gradients in x and y directions
-        const leftIdx = (y * width + (x - 5)) * 4;
-        const rightIdx = (y * width + (x + 5)) * 4;
-        const topIdx = ((y - 5) * width + x) * 4;
-        const bottomIdx = ((y + 5) * width + x) * 4;
-        
-        // Calculate brightness for each point
-        const centerBrightness = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-        const leftBrightness = 0.299 * data[leftIdx] + 0.587 * data[leftIdx + 1] + 0.114 * data[leftIdx + 2];
-        const rightBrightness = 0.299 * data[rightIdx] + 0.587 * data[rightIdx + 1] + 0.114 * data[rightIdx + 2];
-        const topBrightness = 0.299 * data[topIdx] + 0.587 * data[topIdx + 1] + 0.114 * data[topIdx + 2];
-        const bottomBrightness = 0.299 * data[bottomIdx] + 0.587 * data[bottomIdx + 1] + 0.114 * data[bottomIdx + 2];
-        
-        // Calculate gradient magnitudes
-        const gradX = Math.abs(rightBrightness - leftBrightness);
-        const gradY = Math.abs(bottomBrightness - topBrightness);
-        const gradientMagnitude = Math.sqrt(gradX * gradX + gradY * gradY);
-        
-        // If gradient is significant, this might be a corner
-        if (gradientMagnitude > threshold) {
-          corners.push({ x, y, gradient: gradientMagnitude });
-        }
-      }
-    }
-    
-    // Sort corners by gradient magnitude (strongest first)
-    corners.sort((a, b) => b.gradient - a.gradient);
-    
-    // Select the four strongest corners
-    const selectedCorners = corners.slice(0, 4);
-    
-    // If we don't have enough corners, use default positioning
-    if (selectedCorners.length < 4) {
-      const defaultWidth = width * 0.8;
-      const defaultHeight = height * 0.5;
-      return {
-        x: (width - defaultWidth) / 2,
-        y: (height - defaultHeight) / 2,
-        width: defaultWidth,
-        height: defaultHeight
-      };
-    }
-    
-    // Determine card boundaries from corners
-    let minX = Math.min(...selectedCorners.map(c => c.x));
-    let maxX = Math.max(...selectedCorners.map(c => c.x));
-    let minY = Math.min(...selectedCorners.map(c => c.y));
-    let maxY = Math.max(...selectedCorners.map(c => c.y));
-    
-    // Add padding
-    const padding = 20;
-    const cardX = Math.max(0, minX - padding);
-    const cardY = Math.max(0, minY - padding);
-    const cardWidth = Math.min(width - cardX, maxX - minX + padding * 2);
-    const cardHeight = Math.min(height - cardY, maxY - minY + padding * 2);
-    
-    // Ensure minimum size
-    if (cardWidth < 100 || cardHeight < 50) {
-      const defaultWidth = width * 0.8;
-      const defaultHeight = height * 0.5;
-      return {
-        x: (width - defaultWidth) / 2,
-        y: (height - defaultHeight) / 2,
-        width: defaultWidth,
-        height: defaultHeight
-      };
-    }
-    
-    return {
-      x: cardX,
-      y: cardY,
-      width: cardWidth,
-      height: cardHeight
-    };
-  };
-  
-  // Function to draw card boundary with corners
-  const drawCardBoundary = (canvas: HTMLCanvasElement, boundaries: {x: number, y: number, width: number, height: number}) => {
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      // Draw boundary rectangle
-      ctx.strokeStyle = '#00ff00';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(boundaries.x, boundaries.y, boundaries.width, boundaries.height);
-      
-      // Draw corner markers
-      const cornerSize = 10;
-      ctx.strokeStyle = '#ff0000';
-      ctx.lineWidth = 3;
-      
-      // Top-left corner
-      ctx.beginPath();
-      ctx.moveTo(boundaries.x, boundaries.y + cornerSize);
-      ctx.lineTo(boundaries.x, boundaries.y);
-      ctx.lineTo(boundaries.x + cornerSize, boundaries.y);
-      ctx.stroke();
-      
-      // Top-right corner
-      ctx.beginPath();
-      ctx.moveTo(boundaries.x + boundaries.width - cornerSize, boundaries.y);
-      ctx.lineTo(boundaries.x + boundaries.width, boundaries.y);
-      ctx.lineTo(boundaries.x + boundaries.width, boundaries.y + cornerSize);
-      ctx.stroke();
-      
-      // Bottom-left corner
-      ctx.beginPath();
-      ctx.moveTo(boundaries.x, boundaries.y + boundaries.height - cornerSize);
-      ctx.lineTo(boundaries.x, boundaries.y + boundaries.height);
-      ctx.lineTo(boundaries.x + cornerSize, boundaries.y + boundaries.height);
-      ctx.stroke();
-      
-      // Bottom-right corner
-      ctx.beginPath();
-      ctx.moveTo(boundaries.x + boundaries.width - cornerSize, boundaries.y + boundaries.height);
-      ctx.lineTo(boundaries.x + boundaries.width, boundaries.y + boundaries.height);
-      ctx.lineTo(boundaries.x + boundaries.width, boundaries.y + boundaries.height - cornerSize);
-      ctx.stroke();
-    }
-  };
-  
-  // Function to adjust camera zoom based on corner positions
-  const adjustCameraZoom = () => {
-    // In a real implementation, this would adjust the camera zoom level
-    // based on detected corner positions and card size
-    // Browser APIs have limitations for direct zoom control
-    // For now, we'll simulate the zoom adjustment
-    console.log('Adjusting camera zoom based on corner positions...');
-    
-    // Get optimal zoom level
-    const zoomLevel = getCardZoomLevel();
-    console.log(`Setting zoom level to ${zoomLevel}x for optimal card capture`);
-  };
-  
-  // Function to align card in frame based on corner positions
-  const alignCard = () => {
-    // In a real implementation, this would provide visual guidance
-    // to help user align the card properly based on detected corners
-    console.log('Aligning card based on corner positions...');
-    
-    // Simulate alignment process
-    console.log('Corner alignment: 25% complete');
-    setTimeout(() => console.log('Corner alignment: 50% complete'), 200);
-    setTimeout(() => console.log('Corner alignment: 75% complete'), 400);
-    setTimeout(() => console.log('Corner alignment: 100% complete'), 600);
-  };
-  
-  // Function to check if card is properly positioned based on corner alignment
-  const isCardProperlyPositioned = () => {
-    // In a real implementation, this would analyze the frame
-    // to determine if the card is properly aligned based on corner positions
-    
-    // Simulate a 95% success rate for proper positioning with corner detection
-    return Math.random() > 0.05;
-  };
-  
-  // Function to get zoom level for card based on corner positions
-  const getCardZoomLevel = () => {
-    // In a real implementation, this would calculate the optimal zoom
-    // level based on detected corner positions and card size
-    
-    // Return a zoom level based on card size (larger cards need less zoom)
-    return Math.random() * 3 + 1.5; // Random zoom between 1.5x and 4.5x
-  };
-  
-  // Function to show alignment guidance with corner detection
-  const showAlignmentGuidance = () => {
-    // In a real implementation, this would show visual guides
-    // to help the user position the card correctly
-    console.log('Showing alignment guides...');
-    
-    // Simulate showing visual guides
-    console.log('Detecting card corners...');
-    console.log('Displaying corner markers');
-    console.log('Showing alignment grid');
-    console.log('Displaying distance indicators');
-  };
-  
-
-
   const fallbackToInputMethod = () => {
-    if (cameraInputRef.current) {
+    if (fileInputRef.current) {
       // Reset the value to ensure the onChange event fires
-      cameraInputRef.current.value = '';
+      fileInputRef.current.value = '';
       
-      // Try environment camera first (rear camera)
-      const cameraInput = cameraInputRef.current;
-      cameraInput.setAttribute("capture", "environment");
-      
-      // Add mobile-specific attributes
-      cameraInput.setAttribute("accept", "image/*");
-      
-      // Click the input directly with minimal delay to ensure DOM is ready
+      // Click the input directly
       setTimeout(() => {
-        if (cameraInputRef.current) {
+        if (fileInputRef.current) {
           try {
-            cameraInputRef.current.click();
+            fileInputRef.current.click();
           } catch (error) {
-            console.warn('Environment camera failed, trying user camera:', error);
-            // Fallback to user-facing camera
-            try {
-              cameraInputRef.current.setAttribute("capture", "user");
-              cameraInputRef.current.click();
-            } catch (userError) {
-              console.warn('User camera failed, opening file dialog:', userError);
-              // Final fallback: open file dialog without capture attribute
-              cameraInputRef.current.removeAttribute("capture");
-              cameraInputRef.current.click();
-            }
+            console.warn('File input fallback failed:', error);
+            toast({
+              title: "Camera Access Failed",
+              description: "Unable to access camera. Please upload an image instead.",
+              variant: "destructive",
+            });
           }
         }
-      }, 100); // Increased delay for mobile devices
+      }, 100);
     }
   };
 
@@ -512,8 +315,6 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
     }
   };
   
-
-  
   return (
     <Card className="p-2 shadow-medium bg-gradient-card">
       <div className="space-y-1.5">
@@ -552,7 +353,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
           <input
             ref={cameraInputRef}
             type="file"
-            accept="image/*,application/pdf"
+            accept="image/*"
             capture="environment"
             onChange={handleFileSelect}
             className="hidden"

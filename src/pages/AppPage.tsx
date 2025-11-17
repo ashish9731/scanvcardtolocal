@@ -60,6 +60,11 @@ const AppPage = () => {
     }
 
     try {
+      // Validate image data
+      if (!imageData || imageData.length === 0) {
+        throw new Error('No image data received');
+      }
+      
       const cardData = await processImage(imageData);
       setCards((prev) => [...prev, cardData]);
       
@@ -68,11 +73,11 @@ const AppPage = () => {
         title: "Success!",
         description: "Business card data extracted successfully",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("OCR processing error:", error);
       toast({
         title: "Processing failed",
-        description: "Failed to extract data from an image. Please try again.",
+        description: error.message || "Failed to extract data from an image. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -81,10 +86,12 @@ const AppPage = () => {
         const newCount = prev - 1;
         if (newCount <= 0) {
           setIsProcessing(false);
-          toast({
-            title: "Batch processing complete!",
-            description: `Successfully processed ${cards.length + 1} business card(s)`,
-          });
+          if (cards.length > 0 || processingQueue > 0) {
+            toast({
+              title: "Batch processing complete!",
+              description: `Successfully processed ${cards.length + 1} business card(s)`,
+            });
+          }
         }
         return Math.max(0, newCount);
       });
