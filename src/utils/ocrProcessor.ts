@@ -581,7 +581,10 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
         line.toLowerCase().includes(kw.toLowerCase())
       );
       
-      if (!isDesignation) {
+      // Also check that it doesn't contain junk characters like $
+      const hasJunkChars = /[\$]/.test(line);
+      
+      if (!isDesignation && !hasJunkChars) {
         // This looks like a good address candidate
         // Check if it's longer than our current best
         if (line.length > bestAddressCandidate.length) {
@@ -624,7 +627,10 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
             combinedLines.toLowerCase().includes(kw.toLowerCase())
           );
           
-          if (!isDesignation) {
+          // Also check that it doesn't contain junk characters like $
+          const hasJunkChars = /[\$]/.test(combinedLines);
+          
+          if (!isDesignation && !hasJunkChars) {
             // This looks like a good address candidate
             if (combinedLines.length > bestAddressCandidate.length) {
               bestAddressCandidate = combinedLines;
@@ -636,6 +642,7 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   }
   
   // Set the address if we found a good candidate
+  // ONLY set address if we found a valid one, otherwise leave blank
   if (bestAddressCandidate) {
     address = bestAddressCandidate;
   }
@@ -658,6 +665,15 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
       .trim();
   };
   
+  // Special cleaner for designation that removes junk characters including $
+  const cleanDesignation = (text: string): string => {
+    if (!text) return '';
+    return text
+      .replace(/[!*~"'/\-\\(),.?;:#^&[\]{}|<>`=+_\$]/g, '') // Remove junk characters including $
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+  };
+  
   // Ensure email is always populated if we have one (and always contains @)
   const finalEmail = emails[0] || '';
   
@@ -673,11 +689,11 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   return {
     name: name ? cleanText(name) : '',
     company: company ? cleanText(company) : '',
-    designation: designation ? cleanText(designation) : '',
+    designation: designation ? cleanDesignation(designation) : '', // Use special cleaner for designation
     email: finalEmail, // Keep email as is to preserve @
     phone: finalPhone,
     website: finalWebsite ? cleanWebsite(finalWebsite) : '', // Use special cleaner for website
-    address: address ? cleanText(address) : '',
+    address: address ? cleanText(address) : '', // Only set if we found a valid address
     imageData: imageData, // Base64 encoded image data
   };
 };
