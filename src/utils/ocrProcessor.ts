@@ -487,7 +487,17 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   
   // WEBSITE EXTRACTION:
   // Must contain domain suffix (.com, .in, .net, .ai etc.)
-  const finalWebsite = websiteFromEmail || websiteFromText;
+  // Always ensure website starts with www.
+  let finalWebsite = websiteFromEmail || websiteFromText;
+  
+  // Ensure website always starts with www.
+  if (finalWebsite && !finalWebsite.startsWith('www.')) {
+    // Extract domain part and prepend www.
+    const domainMatch = finalWebsite.match(/(?:https?:\/\/)?(?:www\.)?([^\s]+)/i);
+    if (domainMatch && domainMatch[1]) {
+      finalWebsite = `www.${domainMatch[1]}`;
+    }
+  }
   
   // ADDRESS EXTRACTION:
   // Longest multi-line block containing words + digits + commas
@@ -521,11 +531,11 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     }
   }
   
-  // Remove garbage characters from all fields
+  // Remove ALL junk characters from all fields
   const cleanText = (text: string): string => {
     if (!text) return '';
     return text
-      .replace(/[!*~"'/\-]/g, '') // Remove garbage characters
+      .replace(/[!*~"'/\-\\(),.?;:#@^&[\]{}|<>`=+_]/g, '') // Remove ALL junk characters
       .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
   };
