@@ -331,21 +331,9 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   let address = '';
   
   // POSITION-BASED NAME EXTRACTION WITH EMAIL VALIDATION:
-  // 1. Look for names in top-left or centered text
+  // 1. Look for names in top-left or centered positions
   // 2. Validate name against email username if email exists
   // 3. Fallback to email-based extraction only
-  
-  // First, identify potential designations to establish context
-  const designationLines: number[] = [];
-  lines.forEach((line, index) => {
-    for (const keyword of designationKeywords) {
-      if (line.toLowerCase().includes(keyword.toLowerCase())) {
-        designationLines.push(index);
-        if (!designation) designation = line.trim();
-        break;
-      }
-    }
-  });
   
   // Extract email username for validation (part before @)
   let emailUsername = '';
@@ -353,10 +341,14 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
     emailUsername = emails[0].split('@')[0].toLowerCase();
   }
   
-  // Look for names in the top portion of the card
-  const topLines = lines.slice(0, Math.min(8, lines.length)); // Focus on top 8 lines
+  // NEW RULE: If email name from name@company.com matches any name on the card, take that name
+  // Otherwise, take name from email as currently implemented
   
-  // Strategy 1: Find names in top-left or centered positions
+  // First, collect all potential names from the card
+  const potentialNames: {name: string, lineIndex: number}[] = [];
+  const topLines = lines.slice(0, Math.min(10, lines.length)); // Focus on top 10 lines
+  
+  // Collect all potential names from the card
   for (let i = 0; i < topLines.length; i++) {
     const line = topLines[i].trim();
     
@@ -388,73 +380,32 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
       // Additional validation: names don't have special characters
       const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(line);
       if (!hasSpecialChars) {
-        // If we have an email, validate the name against email username
-        if (emailUsername) {
-          // Convert name to lowercase for comparison
-          const nameForComparison = line.toLowerCase().replace(/\s+/g, '');
-          // Check if name matches or is similar to email username
-          if (emailUsername.includes(nameForComparison) || nameForComparison.includes(emailUsername)) {
-            name = line;
-            break;
-          }
-        } else {
-          // No email to validate against, take the first valid name
-          name = line;
-          break;
-        }
+        potentialNames.push({name: line, lineIndex: i});
       }
     }
   }
   
-  // Strategy 2: If no name found or validation failed, try names above designations
-  if (!name && designationLines.length > 0) {
-    const firstDesignationIndex = Math.min(...designationLines);
-    // Look for names in lines above the first designation
-    for (let i = 0; i < Math.min(firstDesignationIndex, lines.length); i++) {
-      const line = lines[i].trim();
+  // NEW RULE IMPLEMENTATION:
+  // If email name from name@company.com matches any name on the card, take that name
+  // Otherwise, take name from email as currently implemented
+  if (emailUsername) {
+    // Look for exact or close matches to the email username
+    for (const potentialName of potentialNames) {
+      // Convert name to lowercase for comparison and remove spaces
+      const nameForComparison = potentialName.name.toLowerCase().replace(/\s+/g, '');
       
-      // Skip empty lines
-      if (!line) continue;
-      
-      // Skip lines with numbers, emails, phones, websites
-      const hasNumbers = /\d/.test(line);
-      const hasEmail = emails.some(e => line.toLowerCase().includes(e));
-      const hasPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
-      const isWebsite = line.toLowerCase().includes('www.') || line.toLowerCase().includes('.com') || line.toLowerCase().includes('.org');
-      
-      if (hasNumbers || hasEmail || hasPhone || isWebsite) continue;
-      
-      // Check if it looks like a name
-      const isAllCaps = line === line.toUpperCase() && line.length > 1;
-      const isProperlyCapitalized = /^[A-Z][a-z]+(\s[A-Z][a-z]+)*$/.test(line);
-      const words = line.split(' ');
-      const isReasonableLength = words.length >= 1 && words.length <= 4;
-      
-      if (isReasonableLength && (isAllCaps || isProperlyCapitalized)) {
-        // Additional validation: names don't have special characters
-        const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(line);
-        if (!hasSpecialChars) {
-          // If we have an email, validate the name against email username
-          if (emailUsername) {
-            // Convert name to lowercase for comparison
-            const nameForComparison = line.toLowerCase().replace(/\s+/g, '');
-            // Check if name matches or is similar to email username
-            if (emailUsername.includes(nameForComparison) || nameForComparison.includes(emailUsername)) {
-              name = line;
-              break;
-            }
-          } else {
-            // No email to validate against, take the first valid name
-            name = line;
-            break;
-          }
-        }
+      // Check if name matches or is similar to email username
+      if (emailUsername === nameForComparison || 
+          emailUsername.includes(nameForComparison) || 
+          nameForComparison.includes(emailUsername)) {
+        name = potentialName.name;
+        break;
       }
     }
   }
   
-  // Strategy 3: Fallback to email-based extraction ONLY (no other fallbacks)
-  if (!name && emails.length > 0 && emailUsername) {
+  // If no matching name found on card, fallback to email-based extraction
+  if (!name && emailUsername) {
     // Convert email username to proper name format (replace dots with spaces and capitalize)
     let extractedName = emailUsername.replace(/\./g, ' ') // Replace dots with spaces
       .replace(/\b\w/g, char => char.toUpperCase()) // Capitalize first letter of each word
