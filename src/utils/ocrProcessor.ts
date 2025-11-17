@@ -228,6 +228,32 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   const emailMatches = normalizedText.match(emailRegex);
   const emails: string[] = emailMatches ? Array.from(emailMatches).map(e => e.toLowerCase()) : [];
   
+  // PHONE EXTRACTION:
+  // Completely rewrite phone extraction with simpler, more effective approach
+  let cleanPhones: string[] = [];
+  
+  // Simple but effective phone regex that captures + format numbers
+  const simplePhoneRegex = /[\+]?[\d\s\-\(\)]{7,20}/g;
+  const simplePhoneMatches = normalizedText.match(simplePhoneRegex);
+  if (simplePhoneMatches) {
+    for (const phone of simplePhoneMatches) {
+      // Clean the phone number - keep only digits and + at the beginning
+      let cleanPhone = phone.replace(/[^+\d]/g, '');
+      // Ensure + is only at the beginning if present
+      if (cleanPhone.startsWith('+')) {
+        cleanPhone = '+' + cleanPhone.substring(1);
+      }
+      // Validate the cleaned phone - 7-15 digits
+      const digitsOnly = cleanPhone.replace(/\+/g, '');
+      if (digitsOnly.length >= 7 && digitsOnly.length <= 15 && /\d/.test(digitsOnly)) {
+        // Avoid duplicates
+        if (!cleanPhones.includes(cleanPhone)) {
+          cleanPhones.push(cleanPhone);
+        }
+      }
+    }
+  }
+  
   // Enhanced phone regex - supports various formats including country codes
   // More comprehensive regex to capture different phone number formats
   const phoneRegex = /(\+?\d{1,4}[-.\s]?)?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/g;
@@ -460,32 +486,6 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
       }
     }
     if (designation) break;
-  }
-  
-  // PHONE EXTRACTION:
-  // Completely rewrite phone extraction with simpler, more effective approach
-  let cleanPhones: string[] = [];
-  
-  // Simple but effective phone regex that captures + format numbers
-  const simplePhoneRegex = /[\+]?[\d\s\-\(\)]{7,20}/g;
-  const simplePhoneMatches = normalizedText.match(simplePhoneRegex);
-  if (simplePhoneMatches) {
-    for (const phone of simplePhoneMatches) {
-      // Clean the phone number - keep only digits and + at the beginning
-      let cleanPhone = phone.replace(/[^+\d]/g, '');
-      // Ensure + is only at the beginning if present
-      if (cleanPhone.startsWith('+')) {
-        cleanPhone = '+' + cleanPhone.substring(1);
-      }
-      // Validate the cleaned phone - 7-15 digits
-      const digitsOnly = cleanPhone.replace(/\+/g, '');
-      if (digitsOnly.length >= 7 && digitsOnly.length <= 15 && /\d/.test(digitsOnly)) {
-        // Avoid duplicates
-        if (!cleanPhones.includes(cleanPhone)) {
-          cleanPhones.push(cleanPhone);
-        }
-      }
-    }
   }
   
   // COMPANY EXTRACTION:
