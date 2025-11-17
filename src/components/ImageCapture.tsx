@@ -296,8 +296,18 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
         
         // Convert to JPEG with good quality for OCR
         const imageData = canvas.toDataURL('image/jpeg', 0.92); // Slightly reduced quality for faster processing
-        setPreview(imageData);
-        onImageCapture(imageData);
+        
+        // Validate image data before sending
+        if (imageData && imageData.length > 0) {
+          setPreview(imageData);
+          onImageCapture(imageData);
+        } else {
+          toast({
+            title: "Image Capture Failed",
+            description: "Failed to capture image data. Please try again.",
+            variant: "destructive",
+          });
+        }
         
         // Stop camera stream
         if (cameraStream) {
@@ -305,6 +315,12 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
           setCameraStream(null);
         }
         setShowCamera(false);
+      } else {
+        toast({
+          title: "Canvas Error",
+          description: "Unable to create canvas for image capture.",
+          variant: "destructive",
+        });
       }
     } else {
       toast({
@@ -314,7 +330,7 @@ export const ImageCapture = ({ onImageCapture }: ImageCaptureProps) => {
       });
     }
   };
-  
+
   return (
     <Card className="p-2 shadow-medium bg-gradient-card">
       <div className="space-y-1.5">

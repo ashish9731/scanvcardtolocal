@@ -47,6 +47,33 @@ const AppPage = () => {
       return;
     }
 
+    // Debug: Log image data information
+    console.log('Image data received:', {
+      length: imageData?.length || 0,
+      type: imageData?.substring(0, 30) || 'null',
+      isDataUrl: imageData?.startsWith('data:image/') || false
+    });
+
+    // Validate image data
+    if (!imageData || imageData.length === 0) {
+      toast({
+        title: "No Image Data",
+        description: "No image data received. Please try capturing again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if it's a valid data URL
+    if (!imageData.startsWith('data:image/')) {
+      toast({
+        title: "Invalid Image Format",
+        description: "Received invalid image format. Please try capturing again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Increment the processing queue
     setProcessingQueue(prev => prev + 1);
     
@@ -60,11 +87,6 @@ const AppPage = () => {
     }
 
     try {
-      // Validate image data
-      if (!imageData || imageData.length === 0) {
-        throw new Error('No image data received');
-      }
-      
       const cardData = await processImage(imageData);
       setCards((prev) => [...prev, cardData]);
       
