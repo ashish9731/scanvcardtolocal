@@ -330,64 +330,87 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
   let company = '';
   let address = '';
   
-  // FIXED RULES IMPLEMENTATION:
+  // POSITION-BASED NAME EXTRACTION:
+  // 1. Look for the largest font text (longest lines with proper name characteristics)
+  // 2. Check top-left or centered positioning
+  // 3. Ensure it's above title/position
+  // 4. Fallback to email-based extraction only
   
-  // NAME EXTRACTION:
-  // 1. Prioritize visually prominent names (big, bold, all caps)
-  // 2. Look for names in the first few lines (typically where names are placed)
-  // 3. Exclude lines with numbers, emails, phones, websites, or designations
-  
-  // First, look for visually prominent names in the first 8 lines
-  for (let i = 0; i < Math.min(8, lines.length); i++) {
-    const line = lines[i].trim();
-    
-    // Skip if line is empty
-    if (!line) continue;
-    
-    // Skip if it's clearly not a name
-    const hasNumbers = /\d/.test(line);
-    const hasEmail = emails.some(e => line.toLowerCase().includes(e));
-    const hasPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
-    const isWebsite = line.toLowerCase().includes('www.') || line.toLowerCase().includes('.com') || line.toLowerCase().includes('.org');
-    
-    if (hasNumbers || hasEmail || hasPhone || isWebsite) continue;
-    
-    // Check if it's a designation
-    const isDesignation = designationKeywords.some(kw => 
-      line.toLowerCase().includes(kw.toLowerCase())
-    );
-    
-    if (isDesignation) continue;
-    
-    // Look for visually prominent names:
-    // - All caps (common for names on business cards)
-    // - Reasonable length (1-4 words)
-    const isAllCaps = line === line.toUpperCase() && line.length > 1;
-    const words = line.split(' ');
-    const isReasonableLength = words.length >= 1 && words.length <= 4;
-    
-    // Additional validation for all caps names
-    if (isAllCaps && isReasonableLength) {
-      // Names typically don't have too many consecutive capital letters or special characters
-      const consecutiveCaps = (line.match(/[A-Z]{3,}/g) || []).length;
-      const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(line);
-      
-      if (consecutiveCaps <= 1 && !hasSpecialChars) {
-        name = line;
+  // First, identify potential designations to establish context
+  const designationLines: number[] = [];
+  lines.forEach((line, index) => {
+    for (const keyword of designationKeywords) {
+      if (line.toLowerCase().includes(keyword.toLowerCase())) {
+        designationLines.push(index);
+        if (!designation) designation = line.trim();
         break;
       }
     }
+  });
+  
+  // Look for names in the top portion of the card, prioritizing position-based heuristics
+  const topLines = lines.slice(0, Math.min(6, lines.length)); // Focus on top 6 lines
+  
+  // Strategy 1: Find the longest line that looks like a name (largest font heuristic)
+  let longestNameCandidate = '';
+  let longestNameIndex = -1;
+  
+  topLines.forEach((line, index) => {
+    const trimmedLine = line.trim();
+    
+    // Skip empty lines
+    if (!trimmedLine) return;
+    
+    // Skip lines with numbers, emails, phones, websites
+    const hasNumbers = /\d/.test(trimmedLine);
+    const hasEmail = emails.some(e => trimmedLine.toLowerCase().includes(e));
+    const hasPhone = phones.some(p => trimmedLine.includes(p.replace(/[\s-]/g, '')));
+    const isWebsite = trimmedLine.toLowerCase().includes('www.') || trimmedLine.toLowerCase().includes('.com') || trimmedLine.toLowerCase().includes('.org');
+    
+    if (hasNumbers || hasEmail || hasPhone || isWebsite) return;
+    
+    // Skip if it's a designation
+    const isDesignation = designationKeywords.some(kw => 
+      trimmedLine.toLowerCase().includes(kw.toLowerCase())
+    );
+    
+    if (isDesignation) return;
+    
+    // Check if it looks like a name (proper capitalization or all caps)
+    const isAllCaps = trimmedLine === trimmedLine.toUpperCase() && trimmedLine.length > 1;
+    const isProperlyCapitalized = /^[A-Z][a-z]+(\s[A-Z][a-z]+)*$/.test(trimmedLine);
+    const words = trimmedLine.split(' ');
+    const isReasonableLength = words.length >= 1 && words.length <= 4;
+    
+    if (isReasonableLength && (isAllCaps || isProperlyCapitalized)) {
+      // Additional validation: names don't have special characters
+      const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(trimmedLine);
+      if (!hasSpecialChars) {
+        // Prefer longer names as they're likely to be the main name
+        if (trimmedLine.length > longestNameCandidate.length) {
+          longestNameCandidate = trimmedLine;
+          longestNameIndex = index;
+        }
+      }
+    }
+  });
+  
+  // If we found a long name candidate, use it
+  if (longestNameCandidate) {
+    name = longestNameCandidate;
   }
   
-  // If no visually prominent name found, try properly capitalized names
-  if (!name) {
-    for (let i = 0; i < Math.min(8, lines.length); i++) {
+  // Strategy 2: If no long name found, look for names above designations
+  if (!name && designationLines.length > 0) {
+    const firstDesignationIndex = Math.min(...designationLines);
+    // Look for names in lines above the first designation
+    for (let i = 0; i < Math.min(firstDesignationIndex, lines.length); i++) {
       const line = lines[i].trim();
       
-      // Skip if line is empty
+      // Skip empty lines
       if (!line) continue;
       
-      // Skip if it's clearly not a name
+      // Skip lines with numbers, emails, phones, websites
       const hasNumbers = /\d/.test(line);
       const hasEmail = emails.some(e => line.toLowerCase().includes(e));
       const hasPhone = phones.some(p => line.includes(p.replace(/[\s-]/g, '')));
@@ -395,26 +418,24 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
       
       if (hasNumbers || hasEmail || hasPhone || isWebsite) continue;
       
-      // Check if it's a designation
-      const isDesignation = designationKeywords.some(kw => 
-        line.toLowerCase().includes(kw.toLowerCase())
-      );
-      
-      if (isDesignation) continue;
-      
-      // Look for properly capitalized names (First Last format)
+      // Check if it looks like a name
+      const isAllCaps = line === line.toUpperCase() && line.length > 1;
       const isProperlyCapitalized = /^[A-Z][a-z]+(\s[A-Z][a-z]+)*$/.test(line);
       const words = line.split(' ');
       const isReasonableLength = words.length >= 1 && words.length <= 4;
       
-      if (isProperlyCapitalized && isReasonableLength) {
-        name = line;
-        break;
+      if (isReasonableLength && (isAllCaps || isProperlyCapitalized)) {
+        // Additional validation: names don't have special characters
+        const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(line);
+        if (!hasSpecialChars) {
+          name = line;
+          break;
+        }
       }
     }
   }
   
-  // FALLBACK: Extract name from email if no name found in text
+  // Strategy 3: Fallback to email-based extraction ONLY (no other fallbacks)
   if (!name && emails.length > 0) {
     const emailParts = emails[0].split('@');
     if (emailParts.length === 2) {
@@ -433,19 +454,6 @@ export const parseCardData = (text: string, imageData: string = ''): Omit<CardDa
         name = extractedName;
       }
     }
-  }
-  
-  // DESIGNATION EXTRACTION:
-  // Line containing title keywords, adjacent to name
-  for (const line of lines) {
-    for (const keyword of designationKeywords) {
-      // Check for exact matches or partial matches
-      if (line.toLowerCase().includes(keyword.toLowerCase())) {
-        designation = line.trim();
-        break;
-      }
-    }
-    if (designation) break;
   }
   
   // PHONE EXTRACTION:
